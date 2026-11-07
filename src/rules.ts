@@ -13,7 +13,7 @@ const AI_ANYCASE = new RegExp(
     "\\bllama\\b", "llama\\.cpp", "ollama", "mistral", "deepseek", "\\bqwen\\b", "\\bkimi\\b", "\\bgrok\\b", "hugging ?face",
     "copilot", "machine learning", "deep learning", "neural net", "large language", "language model",
     "stable diffusion", "diffusion model", "agentic", "multi-agent", "coding agent", "\\bagents?\\b.*\\b(llm|model|tool)",
-    "vibe coding", "prompt (engineering|injection)", "fine-?tun", "\\bgguf\\b", "embeddings?\\b", "vector (db|database|search)",
+    "trí tuệ nhân tạo", "vibe coding", "prompt (engineering|injection)", "fine-?tun", "\\bgguf\\b", "embeddings?\\b", "vector (db|database|search)",
     "inference (engine|server)", "reinforcement learning", "\\bpytorch\\b", "\\btransformers?\\b.*\\b(model|attention)",
     "text-to-(speech|image|video)", "speech-to-text", "world model", "\\bvllm\\b", "langchain", "langgraph", "claude code",
   ].join("|"),
@@ -63,6 +63,49 @@ export function orgsOf(title: string): string[] {
   return ORGS.filter((o) => o.re.test(title)).map((o) => o.key);
 }
 
+/** Industries AI is being applied in. Matched on titles; trade publications also set Source.sector. */
+export const SECTORS: { key: string; label: string; re: RegExp }[] = [
+  { key: "banking", label: "Ngân hàng & tài chính", re: /\bbank(s|ing|ers?)?\b|ngân hàng|fintech|\bfinancial\b|\bcredit (card|union|scor\w+)\b|\bpayments?\b|thanh toán|\binsur(er|ers|ance|tech)\b|bảo hiểm|\banti-money|\bAML\b|\bKYC\b|\bwealth (management|manager|tech)\b|\bpersonal finance\b|\bunderwriting\b|JPMorgan|JP Morgan|Goldman Sachs|Morgan Stanley|Wells Fargo|Citigroup|\bHSBC\b|\bMastercard\b/i },
+  { key: "health", label: "Y tế", re: /health ?care|\bhospitals?\b|\bclinical\b|\bpatients?\b|\bdoctors?\b|\bmedical\b|drug discovery|\bpharma\w*|y tế|bệnh viện/i },
+  { key: "education", label: "Giáo dục", re: /\beducation\b|\bschools?\b|\buniversit(y|ies)\b|\bstudents?\b|\bteachers?\b|\bclassrooms?\b|giáo dục|sinh viên/i },
+  { key: "retail", label: "Bán lẻ & thương mại", re: /\bretail\w*|e-?commerce|agentic commerce|\bshopping\b|\bshoppers?\b|bán lẻ|thương mại điện tử/i },
+  { key: "manufacturing", label: "Sản xuất", re: /\bmanufactur\w+|\bfactor(y|ies)\b|\bindustrial\b|sản xuất/i },
+  { key: "energy", label: "Năng lượng", re: /\butilit(y|ies)\b|power grid|\bthe grid\b|\benergy (sector|industry|company|companies)\b|\boil and gas\b|năng lượng/i },
+  { key: "logistics", label: "Logistics", re: /\blogistics\b|supply chain|\bfreight\b|\bwarehouses?\b|chuỗi cung ứng/i },
+  { key: "legal", label: "Pháp lý", re: /\blegal (AI|tech|industry|teams?|services)\b|\blaw firms?\b|\blawyers?\b|\battorneys?\b|luật sư/i },
+  { key: "government", label: "Chính phủ & công", re: /\bgovernment (agenc\w+|services?|partners?|employees)\b|\bpublic sector\b|\bfederal agenc\w+|\bGovCloud\b|\bGSA\b|chính phủ/i },
+];
+
+export function sectorsOf(title: string, source: Source): string[] {
+  // Papers, model cards and repos describe research and tools, not adoption by an industry.
+  if (source.lane === "papers" || source.lane === "models" || source.lane === "github") return [];
+  return SECTORS
+    .filter((s) => s.re.test(title) || s.key === source.sector || (s.key === "banking" && BANKS.some((b) => b.re.test(title))))
+    .map((s) => s.key);
+}
+
+/** What banks use AI for. */
+export const BANK_THEMES: { key: string; label: string; re: RegExp }[] = [
+  { key: "agents", label: "Agent AI", re: /\bagent(s|ic)?\b/i },
+  { key: "fraud", label: "Chống gian lận", re: /fraud|\bscams?\b|gian lận|lừa đảo|money.laundering|\bAML\b|\bKYC\b|deepfake/i },
+  { key: "cyber", label: "An ninh mạng", re: /cyber|security|vulnerab|\bhack|an ninh mạng|bảo mật/i },
+  { key: "credit", label: "Tín dụng & rủi ro", re: /\bcredit\b|\bloans?\b|\blending\b|underwriting|\brisk\b|tín dụng|rủi ro/i },
+  { key: "payments", label: "Thanh toán", re: /payment|\bcommerce\b|\bcards?\b|thanh toán/i },
+  { key: "service", label: "Dịch vụ khách hàng", re: /customer|chatbot|assistant|personal finance|khách hàng|trợ lý/i },
+  { key: "wealth", label: "Đầu tư & tài sản", re: /wealth|invest(ing|ment|or)|trading|đầu tư/i },
+  { key: "compliance", label: "Quy định & giám sát", re: /regulat|complian|supervis|sound practices|\bFSB\b|\bcentral bank|quy định|giám sát|tuân thủ/i },
+];
+
+export const BANKS: { label: string; re: RegExp }[] = [
+  { label: "JPMorgan", re: /JP ?Morgan/i }, { label: "Goldman Sachs", re: /Goldman/i }, { label: "Morgan Stanley", re: /Morgan Stanley/i },
+  { label: "Bank of America", re: /Bank of America|\bBofA\b/i }, { label: "Citi", re: /\bCiti(group|bank)?\b/ }, { label: "Wells Fargo", re: /Wells Fargo/i },
+  { label: "HSBC", re: /\bHSBC\b/ }, { label: "BMO", re: /\bBMO\b/ }, { label: "Barclays", re: /Barclays/i }, { label: "Revolut", re: /Revolut/i },
+  { label: "Standard Chartered", re: /Standard Chartered/i }, { label: "Commonwealth Bank", re: /Commonwealth Bank|\bCBA\b/ },
+  { label: "Vietcombank", re: /Vietcombank/i }, { label: "BIDV", re: /\bBIDV\b/ }, { label: "VietinBank", re: /VietinBank/i },
+  { label: "Techcombank", re: /Techcombank/i }, { label: "VPBank", re: /VPBank/i }, { label: "MB", re: /\bMB ?Bank\b/i },
+  { label: "ACB", re: /\bACB\b/ }, { label: "TPBank", re: /TPBank/i }, { label: "HDBank", re: /HDBank/i },
+];
+
 // ── 3. Importance ────────────────────────────────────────────────────────────
 const RELEASE = /\b(introduc\w*|announc\w*|launch\w*|releas\w*|unveil\w*|now available|general availability|open[- ]sourc\w*|open[- ]weights?|new model|to acquire|acquires?)\b/i;
 const VERSIONED_MODEL = /\b(GPT|Claude(?: (?:Opus|Sonnet|Haiku|Fable))?|Gemini(?: [A-Z][a-z]+)?|Gemma|Llama|Qwen|DeepSeek(?:[- ][VR])?|Mistral(?: \w+)?|Kimi(?:[- ]K)?|Grok|Sora|Veo|GLM|MiniMax(?:[- ]M)?|Muse(?: \w+)?|Nemotron|Phi)[- ]?(\d+(?:\.\d+)*)\b/gi;
@@ -87,13 +130,13 @@ const TIER_BASE: Record<Source["tier"], number> = { 1: 50, 2: 28, 3: 18 };
 const WEEKLY_THRESHOLD_FACTOR = 5;
 
 /** Keeps any one channel from filling the must-see list, however large its numbers are. */
-export const MUST_LANE_CAP: Record<Lane, number> = { labs: 4, github: 2, models: 2, community: 2, papers: 1, news: 2, tools: 1 };
+export const MUST_LANE_CAP: Record<Lane, number> = { labs: 4, github: 2, models: 2, community: 2, papers: 1, news: 2, tools: 1, industry: 1 };
 
 /** Prolific sources (OpenAI publishes daily) must not bury the others in their column. */
-export const LANE_SOURCE_CAP: Partial<Record<Lane, number>> = { labs: 6, news: 6, community: 18 };
+export const LANE_SOURCE_CAP: Partial<Record<Lane, number>> = { labs: 6, news: 6, community: 18, industry: 6 };
 
 /** Hours for a score to halve, by lane. */
-export const HALF_LIFE_H: Record<Lane, number> = { labs: 96, github: 48, models: 72, papers: 48, community: 36, news: 36, tools: 96 };
+export const HALF_LIFE_H: Record<Lane, number> = { labs: 96, github: 48, models: 72, papers: 48, community: 36, news: 36, tools: 96, industry: 72 };
 
 export interface Classified {
   keep: boolean;
@@ -105,7 +148,7 @@ export interface Classified {
 export function classify(item: RawItem, source: Source): Classified {
   const text = `${item.title} ${item.summary ?? ""}`;
   const drop = { keep: false, topics: [], baseScore: 0, reasons: [] };
-  if (source.aiFilter && !isAiRelated(text)) return drop;
+  if (source.aiFilter && !isAiRelated(source.aiInTitle ? item.title : text)) return drop;
   if (source.kind === "hf-models" && HF_REUPLOAD.test(item.title)) return drop;
 
   const noisy = NOISE.test(item.title);

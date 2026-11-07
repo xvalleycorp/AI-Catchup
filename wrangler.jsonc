@@ -5,7 +5,7 @@
   "compatibility_date": "2026-11-01",
   "compatibility_flags": ["nodejs_compat"],
   "assets": { "directory": "./public" },
-  "routes": [{ "pattern": "catchup.dxa.io.vn", "custom_domain": true }],
+  "routes": [{ "pattern": "catchup.xai.io.vn", "custom_domain": true }],
   // 08:00 and 16:00 Vietnam time (cron is UTC).
   "triggers": { "crons": ["0 1,9 * * *"] },
   "workflows": [{ "name": "ai-catchup-run", "binding": "CATCHUP_RUN", "class_name": "CatchupRun" }],

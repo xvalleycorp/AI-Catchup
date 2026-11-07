@@ -92,6 +92,24 @@ it("shows readers nothing about how the page is produced", () => {
   for (const internal of ["github.com/xvalleycorp", "rule", "api/snapshot", "nguồn đều", "quét", "HF "]) expect(html).not.toContain(internal);
 });
 
+it("gathers banking stories from every channel", () => {
+  const s = build([
+    item({ id: "a", url_key: "1", source: "finextra", title: "Bank A rolls out agents", sectors: '["banking"]' }),
+    item({ id: "b", url_key: "2", source: "hn", title: "JPMorgan and OpenAI", sectors: '["banking"]' }),
+    item({ id: "c", url_key: "3", source: "healthcare-dive", title: "Hospital AI", sectors: '["health"]' }),
+  ]);
+  expect(s.banking?.map((x) => x.source).sort()).toEqual(["finextra", "hn"]);
+  expect(s.story?.banking.rows).toHaveLength(2);
+  expect(s.lanes.industry.map((x) => x.source)).toContain("healthcare-dive");
+  expect(renderPage(s, NOW)).toContain("AI trong ngân hàng");
+});
+
+it("keeps stories with no industry out of the other-industries list", () => {
+  const s = build([item({ id: "a", url_key: "1", source: "pymnts", title: "Tech giants ration AI" })]);
+  const list = renderPage(s, NOW).split("Ứng dụng ở các ngành khác")[1]!;
+  expect(list).not.toContain("Tech giants ration AI");
+});
+
 it("escapes feed content and neutralises unsafe URLs", () => {
   const s = build([item({ title: `<img src=x onerror="alert(1)">`, url: "javascript:alert(1)", reasons: '["<b>"]' })]);
   const html = renderPage(s, NOW);

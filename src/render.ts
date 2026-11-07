@@ -1,6 +1,6 @@
 import type { Row, Snapshot } from "./types";
 
-const ASSET_VERSION = "3";
+const ASSET_VERSION = "4";
 
 /** Next run of the 08:00 / 16:00 Vietnam schedule in wrangler.jsonc. */
 const SCAN_HOURS_VN = [8, 16];
@@ -45,7 +45,7 @@ function rowMeta(r: Row, now: number): string {
 }
 
 function rowAttrs(r: Row): string {
-  return `data-t="${r.t}" data-seen="${r.firstSeen}" data-topics="${esc(r.topics.join(" "))}" data-orgs="${esc((r.orgs ?? []).join(" "))}"`;
+  return `data-t="${r.t}" data-seen="${r.firstSeen}" data-topics="${esc(r.topics.join(" "))}" data-orgs="${esc((r.orgs ?? []).join(" "))}" data-sectors="${esc((r.sectors ?? []).join(" "))}"`;
 }
 
 function laneRow(r: Row, now: number): string {
@@ -59,8 +59,8 @@ function mustRow(r: Row, now: number): string {
   return `<li class="row must-row" ${rowAttrs(r)}><span class="rank" aria-hidden="true"></span><div class="must-body"><div class="reasons">${reasons}</div><div class="row-title"><span class="dot" aria-hidden="true"></span>${externalLink(r.url, esc(r.title))}</div>${summary}<div class="row-meta">${rowMeta(r, now)}</div></div></li>`;
 }
 
-function lane(title: string, rows: Row[], now: number): string {
-  return `<section class="card lane" data-lane><header class="lane-head"><h3>${esc(title)}</h3></header><ol class="rows">${rows.map((r) => laneRow(r, now)).join("")}</ol><p class="empty"${rows.length ? " hidden" : ""}>Không có mục nào khớp bộ lọc.</p><button type="button" class="more" hidden></button></section>`;
+function lane(title: string, rows: Row[], now: number, cls = ""): string {
+  return `<section class="card lane ${cls}" data-lane><header class="lane-head"><h3>${esc(title)}</h3></header><ol class="rows">${rows.map((r) => laneRow(r, now)).join("")}</ol><p class="empty"${rows.length ? " hidden" : ""}>Không có mục nào khớp bộ lọc.</p><button type="button" class="more" hidden></button></section>`;
 }
 
 function chart(id: string, eyebrow: string, title: string, cls = ""): string {
@@ -90,6 +90,17 @@ function charts(s: Snapshot): string {
     ${chart("momentum", "05 · Đà tăng", "Dự án và model đang tăng nhanh", "span-5")}
     ${chart("debate", "06 · Tranh luận", "Điều gì khiến cộng đồng tranh luận", "span-7")}
     ${entities ? entities.replace('class="card chart"', 'class="card chart span-12"') : ""}
+  </div>`;
+}
+
+function sectors(s: Snapshot, now: number): string {
+  if (!s.story?.sectors) return "";
+  return `<div class="section-head"><p class="eyebrow">AI trong các ngành</p><h2>AI đang được ứng dụng ở đâu</h2><p>Trọng tâm: ngân hàng và tài chính.</p></div>
+  <div class="bento">
+    ${chart("sectors", "07 · Theo ngành", "Tin về ứng dụng AI theo ngành", "span-5")}
+    ${chart("banking", "08 · Ngân hàng", "AI trong ngân hàng", "span-7")}
+    ${lane("Tin AI trong ngân hàng & tài chính", s.banking ?? [], now, "span-7")}
+    ${lane("Ứng dụng ở các ngành khác", s.lanes.industry.filter((r) => r.sectors.length > 0 && !r.sectors.includes("banking")), now, "span-5")}
   </div>`;
 }
 
@@ -167,6 +178,8 @@ export function renderPage(s: Snapshot, now: number): string {
   </section>
 
   ${charts(s)}
+
+  ${sectors(s, now)}
 
   <div class="section-head"><p class="eyebrow">Đọc theo kênh</p><h2>Tất cả tin</h2></div>
   <div class="grid">${lanes}</div>

@@ -2,7 +2,7 @@
 
 Toàn cảnh AI trên một trang: tin từ các lab, repo đang lên, model mới, paper và thảo luận cộng đồng. Chọn lọc hoàn toàn bằng rule, không dùng AI.
 
-**Xem tại: [catchup.dxa.io.vn](https://catchup.dxa.io.vn)**
+**Xem tại: [catchup.xai.io.vn](https://catchup.xai.io.vn)**
 
 ## Trang hiển thị gì
 
@@ -11,6 +11,7 @@ Toàn cảnh AI trên một trang: tin từ các lab, repo đang lên, model m�
 | Không nên bỏ lỡ | Tối đa 10 mục đạt ngưỡng quan trọng, kèm lý do chọn |
 | Xu hướng | Số mục theo chủ đề trong 7 ngày, các model được nhiều nguồn nhắc đến. Bấm chủ đề để lọc cả trang |
 | 6 cột theo kênh | Lab, GitHub, Model, Paper, Cộng đồng, Báo chí và phân tích |
+| AI trong các ngành | So sánh 9 ngành, đào sâu ngân hàng theo hướng ứng dụng và tên ngân hàng |
 | Bản phát hành công cụ | Bản ổn định mới nhất của Claude Code, Codex CLI, Ollama, llama.cpp… |
 | Dòng thời gian | Xu hướng theo chủ đề và công ty, tích lũy từ ngày đầu thu thập |
 
@@ -18,7 +19,7 @@ Trình duyệt nhớ lần ghé trước và chấm đỏ các mục mới kể 
 
 ## Nguồn dữ liệu
 
-39 nguồn, khai báo trong [`src/sources.ts`](src/sources.ts):
+54 nguồn, khai báo trong [`src/sources.ts`](src/sources.ts):
 
 - **Lab:** OpenAI, Anthropic (News, Engineering), Google DeepMind, Google AI, Meta AI, Mistral, Hugging Face, NVIDIA, Microsoft Research
 - **GitHub:** Trending (tất cả, Python, TypeScript, theo tuần), repo mới nổi qua Search API
@@ -27,6 +28,8 @@ Trình duyệt nhớ lần ghé trước và chấm đỏ các mục mới kể 
 - **Cộng đồng:** Hacker News, r/LocalLLaMA, r/MachineLearning, Lobsters
 - **Phân tích:** Latent Space / AINews, Simon Willison, Interconnects, Import AI, Ahead of AI
 - **Báo chí:** TechCrunch, The Verge, The Decoder, MIT Technology Review
+- **Ngân hàng và tài chính:** Finextra, Banking Dive, PYMNTS, BIS, FSB, VnEconomy, CafeF
+- **Các ngành khác:** Healthcare Dive, Higher Ed Dive, EdSurge, Retail Dive, Manufacturing Dive, Utility Dive, Supply Chain Dive, Artificial Lawyer
 - **Bản phát hành:** 8 dự án theo dõi qua GitHub Releases
 
 ## Cách hoạt động

@@ -1,9 +1,9 @@
 import { parseSource } from "./parsers";
 import { vnDay } from "./history";
-import { canonicalUrl, classify, hashKey, orgsOf } from "./rules";
+import { canonicalUrl, classify, hashKey, orgsOf, sectorsOf } from "./rules";
 import type { RawItem, Source } from "./types";
 
-const USER_AGENT = "ai-catchup/1.0 (+https://catchup.dxa.io.vn)";
+const USER_AGENT = "ai-catchup/1.0 (+https://catchup.xai.io.vn)";
 const FETCH_TIMEOUT_MS = 15_000;
 /** Newest entries come first, so reading a prefix keeps CPU and memory bounded on 2 MB feeds. */
 const MAX_BODY_BYTES = 700_000;
@@ -88,6 +88,7 @@ function toRow(item: RawItem, source: Source, now: number, hasRunBefore: boolean
     discuss_url: item.discussUrl ?? null,
     topics: JSON.stringify(verdict.topics),
     orgs: JSON.stringify(orgsOf(item.title)),
+    sectors: JSON.stringify(sectorsOf(item.title, source)),
     base_score: verdict.baseScore,
     reasons: JSON.stringify(verdict.reasons),
   };
@@ -97,14 +98,14 @@ const f = (name: string) => `json_extract(value, '$.${name}')`;
 
 /** One statement per source: json_each keeps us well under D1's per-invocation query limit. */
 const UPSERT_SQL = `
-INSERT INTO items (id, source, url_key, title, url, summary, published_at, first_seen, last_seen, signal, metric, discuss_url, topics, orgs, base_score, reasons)
+INSERT INTO items (id, source, url_key, title, url, summary, published_at, first_seen, last_seen, signal, metric, discuss_url, topics, orgs, sectors, base_score, reasons)
 SELECT ${f("id")}, ${f("source")}, ${f("url_key")}, ${f("title")}, ${f("url")}, ${f("summary")}, ${f("published_at")}, ${f("now")}, ${f("now")},
-       ${f("signal")}, ${f("metric")}, ${f("discuss_url")}, ${f("topics")}, ${f("orgs")}, ${f("base_score")}, ${f("reasons")}
+       ${f("signal")}, ${f("metric")}, ${f("discuss_url")}, ${f("topics")}, ${f("orgs")}, ${f("sectors")}, ${f("base_score")}, ${f("reasons")}
 FROM json_each(?1) WHERE true
 ON CONFLICT(id) DO UPDATE SET
-  title = excluded.title, signal = excluded.signal, metric = excluded.metric, topics = excluded.topics, orgs = excluded.orgs,
+  title = excluded.title, signal = excluded.signal, metric = excluded.metric, topics = excluded.topics, orgs = excluded.orgs, sectors = excluded.sectors,
   base_score = excluded.base_score, reasons = excluded.reasons, last_seen = excluded.last_seen
-WHERE ?2 = 1 OR items.signal IS NOT excluded.signal OR items.title IS NOT excluded.title OR items.reasons IS NOT excluded.reasons OR items.orgs IS NOT excluded.orgs`;
+WHERE ?2 = 1 OR items.signal IS NOT excluded.signal OR items.title IS NOT excluded.title OR items.reasons IS NOT excluded.reasons OR items.orgs IS NOT excluded.orgs OR items.sectors IS NOT excluded.sectors`;
 
 const SIGNAL_SQL = `
 INSERT INTO signal_history (item_id, day, signal)

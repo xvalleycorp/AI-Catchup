@@ -1,4 +1,4 @@
-import { ORGS, TOPICS } from "./rules";
+import { BANK_THEMES, BANKS, ORGS, SECTORS, TOPICS } from "./rules";
 import type { DbItem } from "./snapshot";
 import type { MomentumBar, Row, Story } from "./types";
 
@@ -10,6 +10,7 @@ const MAX_DEBATE_POINTS = 60;
 
 const TOPIC_INDEX = new Map(TOPICS.map((t, i) => [t.key, i]));
 const ORG_INDEX = new Map(ORGS.map((o, i) => [o.key, i]));
+const SECTOR_INDEX = new Map(SECTORS.map((s, i) => [s.key, i]));
 
 const indexes = (keys: string[], index: Map<string, number>): number[] => keys.flatMap((k) => index.get(k) ?? []);
 
@@ -54,7 +55,7 @@ function headline(
 export function buildStory(rows: Row[], items: DbItem[], entities: { name: string; sources: number }[], dataStart: number, now: number): Story {
   // Trending entries have no publication date, so they stay out of the timeline and get their own chart.
   const dated = rows.filter((r) => !r.live);
-  const pulse: Story["pulse"] = dated.map((r) => [Math.round(r.t / 1000), indexes(r.topics, TOPIC_INDEX), indexes(r.orgs, ORG_INDEX), r.lane === "labs" ? 1 : 0]);
+  const pulse: Story["pulse"] = dated.map((r) => [Math.round(r.t / 1000), indexes(r.topics, TOPIC_INDEX), indexes(r.orgs, ORG_INDEX), r.lane === "labs" ? 1 : 0, indexes(r.sectors, SECTOR_INDEX)]);
 
   const week = dated.filter((r) => now - r.t <= 7 * DAY);
   const topicCounts = TOPICS.map((t) => ({ label: t.label, count: week.filter((r) => r.topics.includes(t.key)).length })).sort((a, b) => b.count - a.count);
@@ -80,6 +81,16 @@ export function buildStory(rows: Row[], items: DbItem[], entities: { name: strin
     dataStart,
     topics: TOPICS.map((t) => ({ key: t.key, label: t.label })),
     orgs: ORGS.map((o) => ({ key: o.key, label: o.label })),
+    sectors: SECTORS.map((s) => ({ key: s.key, label: s.label })),
+    banking: {
+      themes: BANK_THEMES.map((t) => ({ key: t.key, label: t.label })),
+      banks: BANKS.map((b) => b.label),
+      rows: dated.filter((r) => r.sectors.includes("banking")).map((r) => [
+        Math.round(r.t / 1000),
+        BANK_THEMES.flatMap((t, i) => (t.re.test(r.title) ? [i] : [])),
+        BANKS.flatMap((b, i) => (b.re.test(r.title) ? [i] : [])),
+      ]),
+    },
     pulse,
     momentum: {
       today: bars(items, ["gh-trend-all", "gh-trend-py", "gh-trend-ts"], now, true),

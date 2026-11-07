@@ -4,6 +4,10 @@ const rss = (id: string, name: string, lane: Source["lane"], tier: Source["tier"
   id, name, lane, tier, kind: "rss", url, aiFilter,
 });
 
+const sector = (id: string, name: string, tier: Source["tier"], url: string, key?: string, aiInTitle = true): Source => ({
+  id, name, lane: "industry", tier, kind: "rss", url, aiFilter: true, sector: key, aiInTitle,
+});
+
 const release = (repo: string, name: string): Source => ({
   id: `rel-${repo.replace(/\W+/g, "-").toLowerCase()}`,
   name, lane: "tools", tier: 2, kind: "gh-release",
@@ -59,6 +63,25 @@ export const SOURCES: Source[] = [
   rss("verge", "The Verge AI", "news", 3, "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml"),
   rss("decoder", "The Decoder", "news", 3, "https://the-decoder.com/feed/"),
   rss("mit-tr", "MIT Tech Review", "news", 3, "https://www.technologyreview.com/topic/artificial-intelligence/feed"),
+
+  // AI in banking and finance, followed more closely than other industries
+  sector("finextra", "Finextra", 2, "https://www.finextra.com/rss/channel.aspx?channel=ai", "banking", false),
+  sector("banking-dive", "Banking Dive", 2, "https://www.bankingdive.com/feeds/news/", "banking"),
+  sector("pymnts", "PYMNTS", 3, "https://www.pymnts.com/category/artificial-intelligence-2/feed/", undefined, false),
+  sector("bis-fsi", "BIS", 2, "https://www.bis.org/doclist/bis_fsi_publs.rss", "banking"),
+  sector("fsb", "FSB", 2, "https://www.fsb.org/feed/", "banking"),
+  sector("vneconomy-fin", "VnEconomy", 3, "https://vneconomy.vn/tai-chinh.rss", "banking"),
+  sector("cafef-bank", "CafeF", 3, "https://cafef.vn/tai-chinh-ngan-hang.rss", "banking"),
+
+  // AI in other industries: one trade publication each
+  sector("healthcare-dive", "Healthcare Dive", 3, "https://www.healthcaredive.com/feeds/news/", "health"),
+  sector("highered-dive", "Higher Ed Dive", 3, "https://www.highereddive.com/feeds/news/", "education"),
+  sector("edsurge", "EdSurge", 3, "https://www.edsurge.com/articles_rss", "education"),
+  sector("retail-dive", "Retail Dive", 3, "https://www.retaildive.com/feeds/news/", "retail"),
+  sector("manufacturing-dive", "Manufacturing Dive", 3, "https://www.manufacturingdive.com/feeds/news/", "manufacturing"),
+  sector("utility-dive", "Utility Dive", 3, "https://www.utilitydive.com/feeds/news/", "energy"),
+  sector("supplychain-dive", "Supply Chain Dive", 3, "https://www.supplychaindive.com/feeds/news/", "logistics"),
+  sector("artificial-lawyer", "Artificial Lawyer", 3, "https://www.artificiallawyer.com/feed/", "legal"),
 
   // Tool releases to watch
   release("anthropics/claude-code", "Claude Code"),

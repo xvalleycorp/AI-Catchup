@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canonicalUrl, classify, decayed, entitiesIn, isAiRelated, orgsOf, topicsOf } from "../src/rules";
+import { BANK_THEMES, BANKS, canonicalUrl, classify, decayed, entitiesIn, isAiRelated, orgsOf, sectorsOf, topicsOf } from "../src/rules";
 import type { Source } from "../src/types";
 
 const src = (over: Partial<Source>): Source => ({ id: "x", name: "X", lane: "news", tier: 2, kind: "rss", url: "https://x", ...over });
@@ -73,4 +73,47 @@ it("decayed halves after one half-life", () => {
 it("orgsOf attributes products to their maker without matching lookalikes", () => {
   expect(orgsOf("Claude Code vs ChatGPT")).toEqual(["openai", "anthropic"]);
   expect(orgsOf("Writing metadata for meta tags")).toEqual([]);
+});
+
+describe("sectorsOf", () => {
+  const plain = src({});
+  it.each([
+    ["JPMorgan Chase signs cybersecurity and coding deal with OpenAI", "banking"],
+    ["BMO Turns to Agentic AI to Resolve Card Issues", "banking"],
+    ["Ngân hàng đối mặt 4 thách thức khi ứng dụng AI", "banking"],
+    ["Hospitals adopt AI scribes for patients", "health"],
+    ["AI tutors reach students in rural schools", "education"],
+  ])("classifies %s", (title, expected) => {
+    expect(sectorsOf(title, plain)).toContain(expected);
+  });
+
+  it("ignores research and model listings", () => {
+    expect(sectorsOf("Multi-Teacher Distillation for Hospitals", src({ lane: "papers" }))).toEqual([]);
+  });
+
+  it("requires AI in the headline for general trade press", () => {
+    const press = src({ aiFilter: true, aiInTitle: true });
+    expect(classify({ title: "Wells Fargo exec sees M&A attitude", summary: "AI came up too", url: "https://x" }, press).keep).toBe(false);
+    expect(classify({ title: "Ngân hàng ứng dụng AI", url: "https://x" }, press).keep).toBe(true);
+  });
+
+  it("trusts a trade publication's own industry", () => {
+    expect(sectorsOf("Some AI rollout", src({ sector: "health" }))).toEqual(["health"]);
+  });
+
+  it("does not read unrelated words as banking", () => {
+    expect(sectorsOf("Riverbank model runs", plain)).toEqual([]);
+    expect(sectorsOf("AI talent and the H-1B visa", plain)).toEqual([]);
+  });
+});
+
+it("reads banking themes and bank names from titles", () => {
+  const title = "JPMorgan Chase signs cybersecurity and coding deal with OpenAI";
+  expect(BANK_THEMES.filter((x) => x.re.test(title)).map((x) => x.key)).toEqual(["cyber"]);
+  expect(BANKS.filter((x) => x.re.test(title)).map((x) => x.label)).toEqual(["JPMorgan"]);
+  expect(BANKS.filter((x) => x.re.test("VPBank và Techcombank ứng dụng AI")).map((x) => x.label)).toEqual(["Techcombank", "VPBank"]);
+});
+
+it("recognises Vietnamese AI wording", () => {
+  expect(isAiRelated("Ứng dụng trí tuệ nhân tạo tại ngân hàng")).toBe(true);
 });

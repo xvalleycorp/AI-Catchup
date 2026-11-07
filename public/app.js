@@ -45,6 +45,7 @@
     range: [1, 3, 7, 14].includes(savedRange) ? savedRange : 7,
     topic: null, // topic key
     org: null, // org key
+    sector: null, // sector key
     day: null, // day number
     tab: "today",
     expanded: new Set(),
@@ -54,20 +55,23 @@
   // Each chart ignores its own dimension, so a selection never empties the chart used to change it.
   const topicIndex = (key) => story.topics.findIndex((t) => t.key === key);
   const orgIndex = (key) => story.orgs.findIndex((o) => o.key === key);
+  const sectorIndex = (key) => story.sectors.findIndex((s) => s.key === key);
 
-  function matches(tMs, topics, orgs, ignore = {}) {
+  function matches(tMs, topics, orgs, ignore = {}, sectors = null) {
     if (!ignore.range && state.day === null && tMs < now - state.range * DAY) return false;
     if (!ignore.day && state.day !== null && dayOf(tMs) !== state.day) return false;
     if (!ignore.topic && state.topic && !topics.includes(topicIndex(state.topic))) return false;
     if (!ignore.org && state.org && !orgs.includes(orgIndex(state.org))) return false;
+    if (!ignore.sector && state.sector && sectors && !sectors.includes(sectorIndex(state.sector))) return false;
     return true;
   }
-  const slice = (ignore) => story.pulse.filter(([t, tp, o]) => matches(t * 1000, tp, o, ignore));
+  const slice = (ignore) => story.pulse.filter(([t, tp, o, , sec]) => matches(t * 1000, tp, o, ignore, sec));
 
   function scopeLabel() {
     const parts = [];
     if (state.topic) parts.push(story.topics[topicIndex(state.topic)].label);
     if (state.org) parts.push(story.orgs[orgIndex(state.org)].label);
+    if (state.sector) parts.push(story.sectors[sectorIndex(state.sector)].label);
     return parts.join(", ");
   }
   const rangeLabel = () => (state.day !== null ? `ngày ${dayLabel(state.day)}` : state.range === 1 ? "24 giờ qua" : `${state.range} ngày qua`);
@@ -419,6 +423,11 @@
   }
 
   // ── 04 Timeline: small multiples on one shared scale, with a synced crosshair ─
+  const TIMELINE_VIEWS = {
+    topics: { label: "Chủ đề", state: "topic" },
+    orgs: { label: "Công ty", state: "org" },
+    sectors: { label: "Ngành", state: "sector" },
+  };
   const timeline = { data: null, view: "topics", zoom: 90, bucket: null };
 
   function parseDay(s) { return Math.floor(Date.parse(`${s}T00:00:00Z`) / DAY); }
@@ -439,9 +448,10 @@
     const count = Math.ceil(span / size);
     const index = (day) => Math.floor((day - from) / size);
     const labels = story[timeline.view];
+    const rollup = h[timeline.view] || [];
     const series = labels.map((l) => ({ key: l.key, label: l.label, values: new Array(count).fill(0), total: 0 }));
     const byKey = new Map(series.map((s) => [s.key, s]));
-    for (const [d, k, c] of h[timeline.view]) {
+    for (const [d, k, c] of rollup) {
       const day = parseDay(d);
       const s = byKey.get(k);
       if (!s || day < from || day > last) continue;
@@ -477,7 +487,8 @@
     const collected = today - start + 1;
     const { series, buckets, size, unit, span } = timelineSeries();
     const rise = biggestRise(series);
-    const kind = timeline.view === "topics" ? "Chủ đề" : "Công ty";
+    const VIEW = TIMELINE_VIEWS[timeline.view];
+    const kind = VIEW.label;
     const ready = buckets.length >= 3;
     const plot = setChart(
       "timeline",
@@ -490,7 +501,7 @@
 
     const controls = el("div", "tl-controls");
     const viewTabs = el("div", "tabs");
-    for (const [key, label] of [["topics", "Chủ đề"], ["orgs", "Công ty"]]) {
+    for (const [key, { label }] of Object.entries(TIMELINE_VIEWS)) {
       const b = el("button", "tab", label);
       b.type = "button";
       b.dataset.tlView = key;
@@ -519,13 +530,13 @@
     const H = 72;
     const x = (i) => (buckets.length === 1 ? W / 2 : (i / (buckets.length - 1)) * (W - 8) + 4);
     const y = (v) => H - 4 - (v / max) * (H - 12);
-    const active = timeline.view === "topics" ? state.topic : state.org;
+    const active = state[VIEW.state];
     const crosshairs = [];
 
     for (const s of visible) {
       const panel = el("button", "tl-panel");
       panel.type = "button";
-      panel.dataset[timeline.view === "topics" ? "topic" : "org"] = s.key;
+      panel.dataset[VIEW.state] = s.key;
       panel.setAttribute("aria-pressed", String(active === s.key));
       panel.classList.toggle("is-dim", !!active && active !== s.key);
       const head = el("span", "tl-head");
@@ -580,6 +591,87 @@
     }
   }
 
+  // ── 07 Sectors: banking stays highlighted whatever its rank ───────────────
+  function renderSectors() {
+    const items = slice({ sector: true });
+    const counts = story.sectors.map((s, i) => ({ ...s, count: items.filter((p) => p[4].includes(i)).length }))
+      .filter((s) => s.count > 0 || s.key === "banking")
+      .sort((a, b) => b.count - a.count);
+    const bank = counts.find((s) => s.key === "banking");
+    const total = counts.reduce((sum, s) => sum + s.count, 0);
+    const plot = setChart(
+      "sectors",
+      bank?.count ? `Ngân hàng & tài chính có ${fmt(bank.count)} tin ứng dụng AI, chiếm ${Math.round((bank.count / total) * 100)}% tin theo ngành` : "Chưa có tin ứng dụng AI theo ngành trong khoảng này",
+      `Số tin trong ${rangeLabel()}. Ngân hàng được theo dõi sát hơn các ngành khác, nên so sánh giữa các ngành chỉ mang tính tham khảo.`,
+    );
+    const max = Math.max(1, ...counts.map((s) => s.count));
+    const list = el("div", "hbars hbars-wide");
+    for (const s of counts) {
+      const row = el("button", "hbar");
+      row.type = "button";
+      row.dataset.sector = s.key;
+      row.dataset.tip = "";
+      row.setAttribute("aria-pressed", String(state.sector === s.key));
+      row.classList.toggle("is-dim", !!state.sector && state.sector !== s.key);
+      tip(row, `${fmt(s.count)} tin`, s.label, state.sector === s.key ? "Bấm để bỏ lọc" : "Bấm để lọc cả trang");
+      const fill = el("span", `hbar-fill${s.key === "banking" ? " is-peak" : ""}`);
+      const track = el("span", "hbar-track");
+      track.append(fill);
+      animateSize(fill, `sector-${s.key}`, "width", `${(s.count / max) * 100}%`);
+      row.append(el("span", "hbar-name", s.label), track, el("span", "hbar-value", fmt(s.count)));
+      list.append(row);
+    }
+    plot.append(list);
+    setTable("sectors", ["Ngành", "Số tin"], counts.map((s) => [s.label, s.count]));
+  }
+
+  // ── 08 Banking: what banks use AI for, and which banks are named ──────────
+  function renderBanking() {
+    const { themes, banks, rows } = story.banking;
+    const scoped = rows.filter(([t]) => (state.day !== null ? dayOf(t * 1000) === state.day : t * 1000 >= now - state.range * DAY));
+    const themeCounts = themes.map((t, i) => ({ ...t, count: scoped.filter((r) => r[1].includes(i)).length }))
+      .filter((t) => t.count > 0).sort((a, b) => b.count - a.count);
+    const bankCounts = banks.map((label, i) => ({ label, count: scoped.filter((r) => r[2].includes(i)).length }))
+      .filter((b) => b.count > 0).sort((a, b) => b.count - a.count);
+    const topTheme = themeCounts[0];
+    const plot = setChart(
+      "banking",
+      topTheme ? `${topTheme.label} là hướng ứng dụng được nhắc nhiều nhất, với ${fmt(topTheme.count)}/${fmt(scoped.length)} tin` : `${fmt(scoped.length)} tin về AI trong ngân hàng, chưa rõ hướng nổi bật`,
+      `Trong ${rangeLabel()}. Một tin có thể thuộc nhiều hướng ứng dụng.`,
+    );
+    const split = el("div", "bank-split");
+    const left = el("div");
+    left.append(el("h4", "bank-sub", "Hướng ứng dụng"));
+    const max = Math.max(1, ...themeCounts.map((t) => t.count));
+    const list = el("div", "hbars hbars-wide");
+    themeCounts.forEach((t, i) => {
+      const row = el("div", "hbar");
+      const fill = el("span", `hbar-fill${i === 0 ? " is-peak" : ""}`);
+      const track = el("span", "hbar-track");
+      track.append(fill);
+      animateSize(fill, `theme-${t.key}`, "width", `${(t.count / max) * 100}%`);
+      row.append(el("span", "hbar-name", t.label), track, el("span", "hbar-value", fmt(t.count)));
+      list.append(row);
+    });
+    left.append(list);
+    const right = el("div");
+    right.append(el("h4", "bank-sub", "Ngân hàng được nhắc tên"));
+    if (bankCounts.length) {
+      const names = el("ul", "bank-names");
+      for (const b of bankCounts.slice(0, 8)) {
+        const li = el("li");
+        li.append(el("span", "", b.label), el("span", "bank-count", fmt(b.count)));
+        names.append(li);
+      }
+      right.append(names);
+    } else {
+      right.append(el("p", "empty", "Chưa có ngân hàng nào được nhắc tên trong khoảng này."));
+    }
+    split.append(left, right);
+    plot.append(split);
+    setTable("banking", ["Hướng ứng dụng", "Số tin"], themeCounts.map((t) => [t.label, t.count]));
+  }
+
   // ── Lists, KPIs and filter chips ──────────────────────────────────────────
   function rowMatches(row) {
     const topics = row.dataset.topics.split(" ");
@@ -589,6 +681,7 @@
     else if (t < now - state.range * DAY) return false;
     if (state.topic && !topics.includes(state.topic)) return false;
     if (state.org && !orgs.includes(state.org)) return false;
+    if (state.sector && !(row.dataset.sectors || "").split(" ").includes(state.sector)) return false;
     return true;
   }
 
@@ -639,6 +732,7 @@
     if (state.day !== null) add(`Ngày ${dayLabel(state.day)}`, () => { state.day = null; });
     if (state.topic) add(story.topics[topicIndex(state.topic)].label, () => { state.topic = null; });
     if (state.org) add(story.orgs[orgIndex(state.org)].label, () => { state.org = null; });
+    if (state.sector) add(story.sectors[sectorIndex(state.sector)].label, () => { state.sector = null; });
   }
 
   function render() {
@@ -649,6 +743,8 @@
       renderHeat();
       renderTimeline();
       renderDebate();
+      renderSectors();
+      renderBanking();
     }
     renderKpis();
     renderLists();
@@ -680,7 +776,7 @@
   document.addEventListener("click", (event) => {
     const target = event.target.closest("button");
     if (!target) return;
-    const { range, topic, org, day, tab, laneIndex, tlView, tlZoom } = target.dataset;
+    const { range, topic, org, sector, day, tab, laneIndex, tlView, tlZoom } = target.dataset;
     if (target.classList.contains("chip")) return; // Chips handle themselves.
     if (tlView) {
       timeline.view = tlView;
@@ -708,6 +804,8 @@
       state.topic = state.topic === topic ? null : topic;
     } else if (org) {
       state.org = state.org === org ? null : org;
+    } else if (sector) {
+      state.sector = state.sector === sector ? null : sector;
     } else if (day) {
       state.day = state.day === Number(day) ? null : Number(day);
     } else if (target.classList.contains("more")) {

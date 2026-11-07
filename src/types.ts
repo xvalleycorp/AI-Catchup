@@ -1,4 +1,4 @@
-export type Lane = "labs" | "github" | "models" | "papers" | "community" | "news" | "tools";
+export type Lane = "labs" | "github" | "models" | "papers" | "community" | "news" | "tools" | "industry";
 
 export type SourceKind =
   | "rss"
@@ -27,6 +27,10 @@ export interface Source {
   live?: boolean;
   /** Read only this many bytes of a newest-first response. */
   maxBytes?: number;
+  /** Every AI story from this trade publication belongs to this industry. */
+  sector?: string;
+  /** General trade press mentions AI in passing, so AI must be in the headline itself. */
+  aiInTitle?: boolean;
 }
 
 export interface RawItem {
@@ -55,6 +59,7 @@ export interface Row {
   discussUrl: string | null;
   topics: string[];
   orgs: string[];
+  sectors: string[];
   reasons: string[];
   also: string[];
   score: number;
@@ -82,8 +87,15 @@ export interface Story {
   dataStart: number;
   topics: { key: string; label: string }[];
   orgs: { key: string; label: string }[];
-  /** One entry per dated story: [epoch seconds, topic indexes, org indexes, 1 if from a lab's own channel]. */
-  pulse: [number, number[], number[], 0 | 1][];
+  sectors: { key: string; label: string }[];
+  /** One entry per dated story: [epoch seconds, topic indexes, org indexes, 1 if from a lab's own channel, sector indexes]. */
+  pulse: [number, number[], number[], 0 | 1, number[]][];
+  banking: {
+    themes: { key: string; label: string }[];
+    banks: string[];
+    /** One entry per banking story: [epoch seconds, theme indexes, bank indexes]. */
+    rows: [number, number[], number[]][];
+  };
   momentum: { today: MomentumBar[]; week: MomentumBar[]; fresh: MomentumBar[]; hf: MomentumBar[] };
   debate: DebatePoint[];
   headline: { text: string; em?: boolean }[];
@@ -99,5 +111,7 @@ export interface Snapshot {
   /** True once the database covers 14+ days, so week-over-week deltas are meaningful. */
   deltaReady: boolean;
   health: { id: string; name: string; ok: boolean; lastOk: number; err: string | null; count: number }[];
+  /** Strongest AI-in-banking stories, across every channel. */
+  banking?: Row[];
   story?: Story;
 }

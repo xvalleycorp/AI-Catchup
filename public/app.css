@@ -208,6 +208,13 @@ svg .tl-hair { stroke: var(--ink-3); stroke-width: 1; vector-effect: non-scaling
 .tl-staying li { display: flex; justify-content: space-between; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
 .tl-staying li span { color: var(--ink-3); white-space: nowrap; font-size: 12px; }
 
+/* Sectors and banking */
+.hbars-wide .hbar { grid-template-columns: 150px minmax(0, 1fr) 36px; }
+.bank-split { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 24px; }
+.bank-sub { margin: 0 0 6px; font-size: 13px; font-weight: 700; }
+.bank-names li { display: flex; justify-content: space-between; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 13px; font-weight: 500; }
+.bank-count { font-weight: 700; font-variant-numeric: tabular-nums; }
+
 /* Scatter */
 #debate svg { display: block; max-width: 100%; }
 .grid-line, svg .grid { stroke: var(--line); stroke-width: 1; }
@@ -264,6 +271,7 @@ html:not(.js) .lane .row:nth-child(n+7) { display: none; }
   .must-summary { display: none; }
   .must-row { padding-block: 12px; }
   .tl-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .bank-split { grid-template-columns: minmax(0, 1fr); }
   .tl-panel { padding: 8px 10px 6px; }
   .finding { font-size: 18px; }
   .range { order: 5; width: 100%; }

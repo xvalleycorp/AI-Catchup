@@ -5,6 +5,7 @@ import type { Lane, Row, Snapshot } from "./types";
 
 const DAY = 86_400_000;
 const LANE_SIZE = 30;
+const BANKING_SIZE = 20;
 const MUST_SIZE = 10;
 const MUST_WINDOW = 7 * DAY;
 const ENTITY_WINDOW = 3 * DAY;
@@ -14,10 +15,10 @@ export interface DbItem {
   signal?: number;
   id: string; source: string; url_key: string; title: string; url: string; summary: string | null;
   published_at: number; first_seen: number; last_seen: number; metric: string | null; discuss_url: string | null;
-  topics: string; base_score: number; reasons: string;
+  topics: string; sectors?: string; base_score: number; reasons: string;
 }
 
-const LANES: Lane[] = ["labs", "github", "models", "papers", "community", "news", "tools"];
+const LANES: Lane[] = ["labs", "github", "models", "papers", "community", "news", "tools", "industry"];
 
 export function buildSnapshot(items: DbItem[], statuses: { id: string; last_ok: number; last_err: string | null; last_count: number }[], oldestSeen: number, now: number): Snapshot {
   // Group one story across sources; the strongest copy represents it.
@@ -45,7 +46,7 @@ export function buildSnapshot(items: DbItem[], statuses: { id: string; last_ok: 
     const row: Row = {
       id: item.id, title: item.title, url: item.url, source: source.id, sourceName: source.name, lane: source.lane,
       t, firstSeen: item.first_seen, live, metric: item.metric, summary: item.summary, discussUrl: item.discuss_url,
-      topics, orgs: orgsOf(item.title), reasons: JSON.parse(item.reasons) as string[], also: [],
+      topics, orgs: orgsOf(item.title), sectors: JSON.parse(item.sectors ?? "[]") as string[], reasons: JSON.parse(item.reasons) as string[], also: [],
       score: decayed(item.base_score, age, source.lane),
     };
 
@@ -62,6 +63,7 @@ export function buildSnapshot(items: DbItem[], statuses: { id: string; last_ok: 
       top.reasons = [...new Set([...top.reasons, ...other.reasons])];
       top.topics = [...new Set([...top.topics, ...other.topics])];
       top.orgs = [...new Set([...top.orgs, ...other.orgs])];
+      top.sectors = [...new Set([...top.sectors, ...other.sectors])];
       top.discussUrl ??= other.discussUrl;
       top.firstSeen = Math.min(top.firstSeen, other.firstSeen);
       top.t = Math.max(top.t, other.t);
@@ -141,6 +143,7 @@ export function buildSnapshot(items: DbItem[], statuses: { id: string; last_ok: 
       .filter((t) => t.count > 0)
       .sort((a, b) => b.count - a.count),
     entities: hotEntities.map((e) => ({ name: e.name, sources: e.sources.size, url: e.best?.url ?? "#" })),
+    banking: rows.filter((r) => r.sectors.includes("banking")).sort(byScore).slice(0, BANKING_SIZE),
     story: buildStory(rows, items, hotEntities.map((e) => ({ name: e.name, sources: e.sources.size })), oldestSeen, now),
     deltaReady: oldestSeen > 0 && now - oldestSeen >= 14 * DAY,
     health: SOURCES.map((s) => {
@@ -152,7 +155,7 @@ export function buildSnapshot(items: DbItem[], statuses: { id: string; last_ok: 
 
 export async function rebuildSnapshot(env: Env, now: number): Promise<void> {
   const [items, statuses, oldest] = await env.DB.batch([
-    env.DB.prepare(`SELECT id, source, url_key, title, url, summary, published_at, first_seen, last_seen, signal, metric, discuss_url, topics, base_score, reasons
+    env.DB.prepare(`SELECT id, source, url_key, title, url, summary, published_at, first_seen, last_seen, signal, metric, discuss_url, topics, orgs, sectors, base_score, reasons
                     FROM items WHERE published_at >= ?1 OR last_seen >= ?1 ORDER BY published_at DESC LIMIT 2500`).bind(now - 14 * DAY),
     env.DB.prepare("SELECT id, last_ok, last_err, last_count FROM source_status"),
     env.DB.prepare("SELECT MIN(first_seen) AS oldest FROM items"),

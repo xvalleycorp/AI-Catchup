@@ -37,6 +37,9 @@ export async function rebuildHistory(env: Env, now: number): Promise<void> {
       'orgs', (SELECT json_group_array(json_array(d, k, c)) FROM (
         SELECT ${dayExpr} d, j.value k, COUNT(DISTINCT url_key) c FROM items, json_each(items.orgs) j
         WHERE source NOT IN (${UNDATED}) AND source NOT IN (${OWN_CHANNELS}) AND ${dayExpr} >= ?1 GROUP BY d, k)),
+      'sectors', (SELECT json_group_array(json_array(d, k, c)) FROM (
+        SELECT ${dayExpr} d, j.value k, COUNT(DISTINCT url_key) c FROM items, json_each(items.sectors) j
+        WHERE ${dayExpr} >= ?1 GROUP BY d, k)),
       'staying', (SELECT json_group_array(json_array(title, url, days)) FROM (
         SELECT i.title title, i.url url, COUNT(DISTINCT h.day) days FROM signal_history h JOIN items i ON i.id = h.item_id
         WHERE i.source IN (${DAILY_TRENDING}) GROUP BY i.url_key ORDER BY days DESC, MAX(h.signal) DESC LIMIT 10))
