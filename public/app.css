@@ -543,3 +543,16 @@ html:not(.js) .lane .row:nth-child(n+7) { display: none; }
 .life-provider { display: block; margin-top: 2px; font-family: var(--sans); font-size: 12px; color: var(--ink-3); }
 .caption.warn { color: var(--accent-ink); font-weight: 600; }
 .drawer-cmd { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 14px; color: var(--accent-ink); }
+
+/* Scrollbars: a slim thumb on a clear track, brighter on hover. */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--ink-3) 45%, transparent); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: var(--ink-3); }
+:root[data-skin="terminal"] ::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--phosphor) 30%, transparent); border-radius: 0; }
+:root[data-skin="terminal"] ::-webkit-scrollbar-thumb:hover { background: var(--phosphor); }
+/* Browsers without the pseudo-elements (Firefox) take the standard properties. */
+@supports not selector(::-webkit-scrollbar) {
+  * { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--ink-3) 45%, transparent) transparent; }
+  :root[data-skin="terminal"] * { scrollbar-color: color-mix(in srgb, var(--phosphor) 30%, transparent) transparent; }
+}

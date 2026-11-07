@@ -1,6 +1,6 @@
 import type { Row, Snapshot } from "./types";
 
-const ASSET_VERSION = "11";
+const ASSET_VERSION = "12";
 
 /** Next run of the 08:00 / 16:00 Vietnam schedule in wrangler.jsonc. */
 const SCAN_HOURS_VN = [8, 16];
