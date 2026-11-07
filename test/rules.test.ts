@@ -49,6 +49,13 @@ describe("classify", () => {
     expect(classify({ title: "BMO launches AI agent to help credit card customers", url: "https://x" }, fin).reasons).toEqual(["Ngân hàng triển khai AI"]);
   });
 
+  it("promotes high and critical vulnerabilities only", () => {
+    const sec = src({ kind: "gh-advisory", lane: "security" });
+    expect(classify({ title: "vLLM: pickle RCE", url: "https://x", signal: 98 }, sec).reasons).toEqual(["Lỗ hổng nghiêm trọng"]);
+    expect(classify({ title: "MCP SDK: DoS", url: "https://x", signal: 75 }, sec).reasons).toEqual(["Lỗ hổng mức cao"]);
+    expect(classify({ title: "vLLM: CORS default", url: "https://x", signal: 34 }, sec).reasons).toEqual([]);
+  });
+
   it("ignores popular community fine-tunes and papers", () => {
     const hf = src({ kind: "hf-models", lane: "models" });
     expect(classify({ title: "ccore/Qwen3.5-4B-3D-Coder", url: "https://x", signal: 415 }, hf).reasons).toEqual([]);

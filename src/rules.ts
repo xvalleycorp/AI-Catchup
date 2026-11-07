@@ -154,6 +154,7 @@ export const MUST_THRESHOLD: Partial<Record<Source["kind"], { min: number; label
   "gh-trending": { min: 2000, label: (n) => `+${n.toLocaleString("en-US")} sao` },
   "gh-search": { min: 20000, label: (n) => `Dự án mới ${n.toLocaleString("en-US")} sao` },
   "hf-models": { min: 300, label: () => "Model mở mới từ lab lớn" },
+  "gh-advisory": { min: 70, label: (n) => (n >= 90 ? "Lỗ hổng nghiêm trọng" : "Lỗ hổng mức cao") },
 };
 
 const TIER_BASE: Record<Source["tier"], number> = { 1: 50, 2: 28, 3: 18 };
@@ -162,13 +163,13 @@ const TIER_BASE: Record<Source["tier"], number> = { 1: 50, 2: 28, 3: 18 };
 const WEEKLY_THRESHOLD_FACTOR = 6;
 
 /** Keeps any one channel from filling the must-see list, however large its numbers are. */
-export const MUST_LANE_CAP: Record<Lane, number> = { labs: 4, github: 1, models: 1, community: 2, papers: 0, news: 3, tools: 0, industry: 3 };
+export const MUST_LANE_CAP: Record<Lane, number> = { labs: 4, github: 1, models: 1, community: 2, papers: 0, news: 3, tools: 0, industry: 3, security: 2 };
 
 /** Prolific sources (OpenAI publishes daily) must not bury the others in their column. */
 export const LANE_SOURCE_CAP: Partial<Record<Lane, number>> = { labs: 6, news: 6, community: 18, industry: 6 };
 
 /** Hours for a score to halve, by lane. */
-export const HALF_LIFE_H: Record<Lane, number> = { labs: 96, github: 48, models: 72, papers: 48, community: 36, news: 36, tools: 96, industry: 72 };
+export const HALF_LIFE_H: Record<Lane, number> = { labs: 96, github: 48, models: 72, papers: 48, community: 36, news: 36, tools: 96, industry: 72, security: 168 };
 
 export interface Classified {
   keep: boolean;
@@ -206,6 +207,8 @@ export function classify(item: RawItem, source: Source): Classified {
   const minSignal = threshold ? threshold.min * (source.id === "gh-trend-week" ? WEEKLY_THRESHOLD_FACTOR : 1) : 0;
   const popularEnough = threshold && signal >= minSignal && (source.kind !== "hf-models" || MAJOR_MODEL_ORGS.test(item.title));
   if (popularEnough) reasons.push(`${threshold.label(signal)}${source.id === "gh-trend-week" ? " trong tuần" : ""}`);
+  // A serious flaw in a library the bank may run is as actionable as a regulation.
+  if (popularEnough && source.kind === "gh-advisory") score += ARCHITECT_BOOST;
   if (source.lane === "labs" && source.tier === 1 && !noisy && (release || hasModel) && !reasons.length) reasons.push(`${source.name} công bố`);
   if (source.kind === "openrouter" && MAJOR_MODEL_PROVIDER.test(item.title)) reasons.push("Model mới");
 

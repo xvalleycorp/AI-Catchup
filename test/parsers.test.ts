@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cleanText, parseAnthropic, parseFeed, parseHn, parseMeta, parseOpenRouter, parseReleases, parseTrending } from "../src/parsers";
+import { cleanText, parseAdvisories, parseAnthropic, parseLifecycle, parseFeed, parseHn, parseMeta, parseOpenRouter, parseReleases, parseTrending } from "../src/parsers";
 
 describe("parseFeed", () => {
   it("reads RSS with CDATA and entities", () => {
@@ -77,4 +77,68 @@ describe("parseReleases", () => {
 it("cleanText strips double-encoded markup and truncates", () => {
   expect(cleanText("&lt;p&gt;a &amp;amp; b&lt;/p&gt;")).toBe("a & b");
   expect(cleanText("abcdef", 4)).toBe("abc…");
+});
+
+describe("parseAdvisories", () => {
+  const advisory = (over: Record<string, unknown>) => ({
+    ghsa_id: "GHSA-1", html_url: "https://github.com/advisories/GHSA-1", summary: "Path traversal in loader", severity: "high",
+    cvss: { score: 7.5 }, published_at: "2026-11-01T00:00:00Z", withdrawn_at: null,
+    vulnerabilities: [{ package: { name: "langchain-core" }, first_patched_version: "0.3.5" }], ...over,
+  });
+
+  it("names the package, scores by CVSS and states the fix", () => {
+    const [item] = parseAdvisories(JSON.stringify([advisory({})]));
+    expect(item).toMatchObject({ title: "langchain-core: Path traversal in loader", signal: 75, metric: "CAO · CVSS 7.5 · bản vá 0.3.5" });
+  });
+
+  it("does not repeat a package already in the summary, and handles a missing score or fix", () => {
+    const [item] = parseAdvisories(JSON.stringify([advisory({
+      summary: "vLLM: DoS via image", severity: "critical", cvss: { score: null },
+      vulnerabilities: [{ package: { name: "vllm" }, first_patched_version: null }],
+    })]));
+    expect(item).toMatchObject({ title: "vLLM: DoS via image", signal: 95, metric: "NGHIÊM TRỌNG · chưa có bản vá" });
+  });
+
+  it("drops withdrawn advisories and foreign links", () => {
+    expect(parseAdvisories(JSON.stringify([advisory({ withdrawn_at: "2026-11-02" }), advisory({ html_url: "javascript:x" })]))).toEqual([]);
+  });
+});
+
+describe("parseLifecycle", () => {
+  it("reads pipe tables and skips tentative dates", () => {
+    const md = [
+      "| API model name | Current state | Deprecated | Tentative retirement date |",
+      "| :-- | :-- | :-- | :-- |",
+      "| claude-opus-5-5 | Active | N/A | Not sooner than September 22, 2027 |",
+      "| claude-sonnet-4-5-20250929 | Deprecated | September 30, 2026 | November 30, 2026 |",
+      "",
+      "| Shutdown date | Model / system | Recommended replacement |",
+      "| --- | --- | --- |",
+      "| Apr 1, 2027 | `gpt-5.4-nano` \\| `gpt-5.4-nano-2026-03-17` | `gpt-6-luna` |",
+    ].join("\n");
+    expect(parseLifecycle(md)).toEqual([
+      { model: "claude-sonnet-4-5-20250929", retiresAt: Date.parse("November 30, 2026"), replacement: "" },
+      { model: "gpt-5.4-nano / gpt-5.4-nano-2026-03-17", retiresAt: Date.parse("Apr 1, 2027"), replacement: "gpt-6-luna" },
+    ]);
+  });
+
+  it("reads Markdoc tables", () => {
+    const md = `{% table %}
+  * Model
+  * Release date
+  * Shutdown date
+  * Recommended replacement
+  ---
+  * \`gemini-3.8-flash\`
+  * September 2, 2026
+  * No shutdown date announced
+  *
+  ---
+  * \`gemini-3.5-pro\`
+  * March 1, 2026
+  * January 15, 2027
+  * \`gemini-3.8-pro\`
+{% /table %}`;
+    expect(parseLifecycle(md)).toEqual([{ model: "gemini-3.5-pro", retiresAt: Date.parse("January 15, 2027"), replacement: "gemini-3.8-pro" }]);
+  });
 });

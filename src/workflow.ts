@@ -1,7 +1,7 @@
 import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from "cloudflare:workers";
 import { rebuildHistory } from "./history";
-import { ingestSource, recordFailure } from "./ingest";
-import { SOURCES } from "./sources";
+import { ingestLifecycle, ingestSource, recordFailure } from "./ingest";
+import { LIFECYCLE_SOURCES, SOURCES } from "./sources";
 import { rebuildSnapshot } from "./snapshot";
 
 const SOURCE_STEP = { retries: { limit: 2, delay: "1 minute", backoff: "exponential" }, timeout: "2 minutes" } as const;
@@ -18,6 +18,16 @@ export class CatchupRun extends WorkflowEntrypoint<Env> {
     for (const source of SOURCES) {
       try {
         await step.do(`ingest ${source.id}`, SOURCE_STEP, () => ingestSource(this.env, source, now));
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        failed.push(source.id);
+        await step.do(`record failure ${source.id}`, () => recordFailure(this.env, source, now, message));
+      }
+    }
+
+    for (const source of LIFECYCLE_SOURCES) {
+      try {
+        await step.do(`lifecycle ${source.id}`, SOURCE_STEP, () => ingestLifecycle(this.env, source, now));
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
         failed.push(source.id);

@@ -1,6 +1,6 @@
 import type { Row, Snapshot } from "./types";
 
-const ASSET_VERSION = "8";
+const ASSET_VERSION = "9";
 
 /** Next run of the 08:00 / 16:00 Vietnam schedule in wrangler.jsonc. */
 const SCAN_HOURS_VN = [8, 16];
@@ -106,6 +106,70 @@ function sectors(s: Snapshot, now: number): string {
   </section>`;
 }
 
+const DAY_MS = 86_400_000;
+const SEVERITY_CLASS: Record<string, string> = { "NGHIÊM TRỌNG": "sev-critical", CAO: "sev-high", "TRUNG BÌNH": "sev-medium", "THẤP": "sev-low" };
+
+function vnDate(ms: number): string {
+  return new Date(ms).toLocaleDateString("vi-VN", { timeZone: "UTC", day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+function advisoryRow(r: Row, now: number): string {
+  const label = (r.metric ?? "").split(" · ")[0] ?? "";
+  const rest = (r.metric ?? "").split(" · ").slice(1).join(" · ");
+  const badge = SEVERITY_CLASS[label] ? `<span class="sev ${SEVERITY_CLASS[label]}">${esc(label)}</span>` : "";
+  return `<li class="row sec-row" ${rowAttrs(r)}><div class="row-title">${badge}<span class="dot" aria-hidden="true"></span>${externalLink(r.url, esc(r.title))}</div><div class="row-meta"><span class="src">${esc(r.summary ?? "")}</span><i aria-hidden="true">·</i><time data-t="${r.t}">${timeAgo(r.t, now)}</time>${rest ? `<i aria-hidden="true">·</i><span class="metric">${esc(rest)}</span>` : ""}</div></li>`;
+}
+
+function lifecycleStatus(retiresAt: number, now: number): { text: string; cls: string } {
+  const days = Math.ceil((retiresAt - now) / DAY_MS);
+  if (days < 0) return { text: "Đã ngừng", cls: "life-past" };
+  if (days === 0) return { text: "Ngừng hôm nay", cls: "life-soon" };
+  return { text: `Còn ${days} ngày`, cls: days <= 30 ? "life-soon" : days <= 90 ? "life-near" : "life-later" };
+}
+
+function risk(s: Snapshot, now: number): string {
+  // Most severe first, then newest: the list leads with what needs action.
+  const rank = (row: Row) => ["THẤP", "TRUNG BÌNH", "CAO", "NGHIÊM TRỌNG"].indexOf((row.metric ?? "").split(" · ")[0] ?? "");
+  const advisories = [...(s.lanes.security ?? [])].sort((a, b) => rank(b) - rank(a) || b.t - a.t);
+  const serious = advisories.filter((r) => /^(NGHIÊM TRỌNG|CAO)\b/.test(r.metric ?? ""));
+  const life = s.lifecycle ?? [];
+  const upcoming = life.filter((l) => l.retiresAt >= now);
+  const within90 = upcoming.filter((l) => l.retiresAt - now <= 90 * DAY_MS);
+  const next = upcoming[0];
+  // Never present a failed fetch as "no vulnerabilities": that would read as an all-clear.
+  const advisoryFeedsDown = s.health.filter((h) => h.id.startsWith("sec-") && !h.ok).length;
+  const advisoryFinding = advisoryFeedsDown && !advisories.length
+    ? "Tạm thời chưa cập nhật được dữ liệu lỗ hổng"
+    : serious.length
+    ? `${serious.length} lỗ hổng mức cao trở lên trong 14 ngày qua`
+    : advisories.length ? `${advisories.length} lỗ hổng mới, chưa có lỗ hổng mức cao` : "Chưa ghi nhận lỗ hổng mới trong 14 ngày";
+  const lifeFinding = next
+    ? `${within90.length} model ngừng hỗ trợ trong 90 ngày tới. Gần nhất: ${next.model} (${next.provider}) ngày ${vnDate(next.retiresAt)}`
+    : "Chưa có lịch ngừng hỗ trợ nào sắp tới";
+  const lifeRows = life.map((l) => {
+    const st = lifecycleStatus(l.retiresAt, now);
+    return `<tr class="${st.cls}"><td class="life-date">${vnDate(l.retiresAt)}</td><td>${esc(l.provider)}</td><td class="life-model">${externalLink(l.url, esc(l.model))}</td><td>${esc(l.replacement || "–")}</td><td><span class="life-status">${st.text}</span></td></tr>`;
+  }).join("");
+  return `<div class="section-head"><p class="eyebrow">Rủi ro nền tảng</p><h2>Bảo mật &amp; vòng đời nền tảng AI</h2></div>
+  <div class="bento">
+    <section class="card span-12 lane sec-lane" data-lane data-unfiltered>
+      <p class="eyebrow">Lỗ hổng bảo mật · Thư viện AI phổ biến</p>
+      <h3 class="finding">${esc(advisoryFinding)}</h3>
+      <ol class="rows">${advisories.map((r) => advisoryRow(r, now)).join("")}</ol>
+      <p class="empty"${advisories.length ? " hidden" : ""}>${advisoryFeedsDown ? "Chưa lấy được dữ liệu lỗ hổng ở lần cập nhật này. Đây không có nghĩa là không có lỗ hổng." : "Không có lỗ hổng mới trong 14 ngày qua."}</p>
+      ${advisoryFeedsDown && advisories.length ? '<p class="caption warn">Một phần dữ liệu lỗ hổng chưa cập nhật được ở lần này, danh sách có thể chưa đầy đủ.</p>' : ""}
+      <button type="button" class="more" hidden></button>
+      <p class="caption">LangChain, LlamaIndex, Transformers, vLLM, Ollama, MCP SDK, OpenAI và Anthropic SDK cùng các thư viện AI phổ biến khác. Mức độ theo đánh giá của GitHub.</p>
+    </section>
+    <section class="card span-12">
+      <p class="eyebrow">Vòng đời model · Lịch ngừng hỗ trợ</p>
+      <h3 class="finding">${esc(lifeFinding)}</h3>
+      ${life.length ? `<div class="life-wrap"><table class="life"><thead><tr><th>Ngày ngừng</th><th>Nhà cung cấp</th><th>Model</th><th>Thay thế bằng</th><th>Trạng thái</th></tr></thead><tbody>${lifeRows}</tbody></table></div>` : ""}
+      <p class="caption">Chỉ gồm ngày ngừng đã được nhà cung cấp công bố chắc chắn, không gồm ngày dự kiến. OpenAI, Anthropic, Google Gemini.</p>
+    </section>
+  </div>`;
+}
+
 function tools(s: Snapshot, now: number): string {
   if (!s.lanes.tools.length) return "";
   const cells = s.lanes.tools.map((r) => `<li class="tool" data-seen="${r.firstSeen}">${externalLink(r.url, esc(r.title))}<time data-t="${r.t}">${timeAgo(r.t, now)}</time></li>`).join("");
@@ -190,7 +254,9 @@ export function renderPage(s: Snapshot, now: number): string {
     <header class="pane-head" role="tablist" aria-label="Nội dung khung giữa">
       <button type="button" class="pane-tab" role="tab" data-center-tab="overview" aria-selected="true">[2] TỔNG QUAN</button>
       <button type="button" class="pane-tab" role="tab" data-center-tab="all" aria-selected="false">[4] TẤT CẢ TIN</button>
+      <button type="button" class="pane-tab" role="tab" data-center-tab="risk" aria-selected="false">[5] BẢO MẬT &amp; VÒNG ĐỜI</button>
     </header>
+    <div class="pane-risk">${risk(s, now)}</div>
     <div class="pane-overview">${charts(s)}</div>
     <div class="pane-all">
       <div class="section-head"><h2>Tất cả tin</h2></div>
@@ -208,7 +274,7 @@ export function renderPage(s: Snapshot, now: number): string {
   <label for="cmd-input">catchup:~$</label>
   <input id="cmd-input" name="cmd" autocomplete="off" spellcheck="false" placeholder="gõ lệnh, ví dụ: tìm openai · ngành ngân hàng · khoảng 3 · help">
   <output id="cmd-out" for="cmd-input" aria-live="polite"></output>
-  <span class="cmd-keys">1–4 chọn khung · / gõ lệnh · Esc đóng</span>
+  <span class="cmd-keys">1–5 chọn khung · / gõ lệnh · Esc đóng</span>
 </form>
 <aside class="drawer" id="drawer" aria-labelledby="drawer-title" hidden>
   <header class="drawer-head">

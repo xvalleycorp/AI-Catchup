@@ -1,4 +1,4 @@
-export type Lane = "labs" | "github" | "models" | "papers" | "community" | "news" | "tools" | "industry";
+export type Lane = "labs" | "github" | "models" | "papers" | "community" | "news" | "tools" | "industry" | "security";
 
 export type SourceKind =
   | "rss"
@@ -11,7 +11,8 @@ export type SourceKind =
   | "openrouter"
   | "lobsters"
   | "anthropic"
-  | "meta";
+  | "meta"
+  | "gh-advisory";
 
 export interface Source {
   id: string;
@@ -116,7 +117,27 @@ export interface Snapshot {
   /** True once the database covers 14+ days, so week-over-week deltas are meaningful. */
   deltaReady: boolean;
   health: { id: string; name: string; ok: boolean; lastOk: number; err: string | null; count: number }[];
+  /** Announced model shutdowns, soonest first. */
+  lifecycle?: LifecycleEntry[];
   /** Strongest AI-in-banking stories, across every channel. */
   banking?: Row[];
   story?: Story;
+}
+
+/** A model shutdown date as published on a provider's deprecations page. */
+export interface LifecycleSource {
+  id: string;
+  provider: string;
+  /** Machine-readable (Markdown) version of the page. */
+  url: string;
+  /** The page a reader should open. */
+  page: string;
+}
+
+export interface LifecycleEntry {
+  provider: string;
+  model: string;
+  retiresAt: number;
+  replacement: string;
+  url: string;
 }

@@ -1,7 +1,7 @@
 import { decayed, entitiesIn, LANE_SOURCE_CAP, MUST_LANE_CAP, orgsOf, TOPICS } from "./rules";
 import { buildStory } from "./story";
-import { SOURCE_BY_ID, SOURCES } from "./sources";
-import type { Lane, Row, Snapshot } from "./types";
+import { LIFECYCLE_SOURCES, SOURCE_BY_ID, SOURCES } from "./sources";
+import type { Lane, LifecycleEntry, Row, Snapshot } from "./types";
 
 const DAY = 86_400_000;
 const LANE_SIZE = 30;
@@ -18,7 +18,7 @@ export interface DbItem {
   topics: string; sectors?: string; base_score: number; reasons: string;
 }
 
-const LANES: Lane[] = ["labs", "github", "models", "papers", "community", "news", "tools", "industry"];
+const LANES: Lane[] = ["labs", "github", "models", "papers", "community", "news", "tools", "industry", "security"];
 
 export function buildSnapshot(items: DbItem[], statuses: { id: string; last_ok: number; last_err: string | null; last_count: number }[], oldestSeen: number, now: number): Snapshot {
   // Group one story across sources; the strongest copy represents it.
@@ -146,7 +146,7 @@ export function buildSnapshot(items: DbItem[], statuses: { id: string; last_ok: 
     banking: rows.filter((r) => r.sectors.includes("banking")).sort(byScore).slice(0, BANKING_SIZE),
     story: buildStory(rows, items, hotEntities.map((e) => ({ name: e.name, sources: e.sources.size })), oldestSeen, now),
     deltaReady: oldestSeen > 0 && now - oldestSeen >= 14 * DAY,
-    health: SOURCES.map((s) => {
+    health: [...SOURCES, ...LIFECYCLE_SOURCES.map((l) => ({ id: l.id, name: `Lịch ngừng · ${l.provider}` }))].map((s) => {
       const st = statusById.get(s.id);
       return { id: s.id, name: s.name, ok: !!st && !st.last_err && st.last_ok > 0, lastOk: st?.last_ok ?? 0, err: st?.last_err ?? null, count: st?.last_count ?? 0 };
     }),
@@ -154,11 +154,16 @@ export function buildSnapshot(items: DbItem[], statuses: { id: string; last_ok: 
 }
 
 export async function rebuildSnapshot(env: Env, now: number): Promise<void> {
-  const [items, statuses, oldest] = await env.DB.batch([
+  const [items, statuses, oldest, lifecycle] = await env.DB.batch([
     env.DB.prepare(`SELECT id, source, url_key, title, url, summary, published_at, first_seen, last_seen, signal, metric, discuss_url, topics, orgs, sectors, base_score, reasons
                     FROM items WHERE published_at >= ?1 OR last_seen >= ?1 ORDER BY published_at DESC LIMIT 2500`).bind(now - 14 * DAY),
     env.DB.prepare("SELECT id, last_ok, last_err, last_count FROM source_status"),
     env.DB.prepare("SELECT MIN(first_seen) AS oldest FROM items"),
+    // Shutdowns from the last 30 days stay visible as "đã ngừng"; rows a page no longer lists drop out after a week.
+    env.DB.prepare(`SELECT provider, model, retires_at AS retiresAt, COALESCE(replacement, '') AS replacement, url FROM lifecycle
+                    WHERE retires_at >= ?1 AND last_seen >= ?2
+                    ORDER BY retires_at < ?3, CASE WHEN retires_at >= ?3 THEN retires_at ELSE -retires_at END
+                    LIMIT 80`).bind(now - 30 * DAY, now - 7 * DAY, now),
   ]);
   const snapshot = buildSnapshot(
     items!.results as unknown as DbItem[],
@@ -166,6 +171,7 @@ export async function rebuildSnapshot(env: Env, now: number): Promise<void> {
     (oldest!.results[0] as { oldest: number | null } | undefined)?.oldest ?? 0,
     now,
   );
+  snapshot.lifecycle = lifecycle!.results as unknown as LifecycleEntry[];
   await env.DB.prepare("INSERT INTO kv (key, value, updated_at) VALUES ('snapshot', ?1, ?2) ON CONFLICT(key) DO UPDATE SET value = ?1, updated_at = ?2")
     .bind(JSON.stringify(snapshot), now).run();
 }

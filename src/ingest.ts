@@ -1,7 +1,7 @@
-import { parseSource } from "./parsers";
+import { parseLifecycle, parseSource } from "./parsers";
 import { vnDay } from "./history";
 import { canonicalUrl, classify, hashKey, orgsOf, sectorsOf } from "./rules";
-import type { RawItem, Source } from "./types";
+import type { LifecycleSource, RawItem, Source } from "./types";
 
 const USER_AGENT = "ai-catchup/1.0 (+https://catchup.xai.io.vn)";
 const FETCH_TIMEOUT_MS = 15_000;
@@ -46,7 +46,7 @@ function requestUrl(source: Source, now: number): string {
 
 async function fetchSource(source: Source, env: Env, now: number): Promise<RawItem[]> {
   const headers: Record<string, string> = { "User-Agent": USER_AGENT };
-  if (source.kind === "gh-search") {
+  if (source.kind === "gh-search" || source.kind === "gh-advisory") {
     headers.Accept = "application/vnd.github+json";
     const token = (env as { GITHUB_TOKEN?: string }).GITHUB_TOKEN;
     if (token) headers.Authorization = `Bearer ${token}`;
@@ -57,7 +57,7 @@ async function fetchSource(source: Source, env: Env, now: number): Promise<RawIt
     throw new Error(`HTTP ${res.status}`);
   }
   // JSON cannot be truncated; these endpoints are bounded in size by their own limits.
-  const isJson = ["gh-search", "hn", "hf-models", "hf-papers", "lobsters"].includes(source.kind);
+  const isJson = ["gh-search", "gh-advisory", "hn", "hf-models", "hf-papers", "lobsters"].includes(source.kind);
   const raw = parseSource(source, isJson ? await res.text() : await readBounded(res, source.maxBytes ?? MAX_BODY_BYTES));
   // An empty parse from a page that has items means the upstream markup changed.
   if (raw.length === 0) throw new Error("Không đọc được mục nào (định dạng nguồn có thể đã đổi)");
@@ -131,10 +131,34 @@ export async function ingestSource(env: Env, source: Source, now: number): Promi
 }
 
 /** Keeps the previous items and last_ok, so a failing source stays visible in the health panel. */
-export async function recordFailure(env: Env, source: Source, now: number, error: string): Promise<void> {
+export async function recordFailure(env: Env, source: { id: string }, now: number, error: string): Promise<void> {
   console.warn(JSON.stringify({ event: "source_failed", source: source.id, error }));
   await env.DB.prepare(
     `INSERT INTO source_status (id, last_run, last_ok, last_err, last_count) VALUES (?1, ?2, 0, ?3, 0)
      ON CONFLICT(id) DO UPDATE SET last_run = ?2, last_err = ?3`,
   ).bind(source.id, now, error.slice(0, 200)).run();
+}
+
+/** Reads one provider's deprecations page and stores its definite shutdown dates. */
+export async function ingestLifecycle(env: Env, source: LifecycleSource, now: number): Promise<number> {
+  const res = await fetch(source.url, { headers: { "User-Agent": USER_AGENT }, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+  if (!res.ok) {
+    await res.body?.cancel();
+    throw new Error(`HTTP ${res.status}`);
+  }
+  const rows = parseLifecycle(await readBounded(res, MAX_BODY_BYTES));
+  if (rows.length === 0) throw new Error("Không đọc được lịch ngừng hỗ trợ (định dạng trang có thể đã đổi)");
+  await env.DB.batch([
+    env.DB.prepare(`
+      INSERT INTO lifecycle (provider, model, retires_at, replacement, url, first_seen, last_seen)
+      SELECT ?2, json_extract(value, '$.model'), json_extract(value, '$.retiresAt'), json_extract(value, '$.replacement'), ?3, ?4, ?4
+      FROM json_each(?1) WHERE true
+      ON CONFLICT(provider, model) DO UPDATE SET retires_at = excluded.retires_at, replacement = excluded.replacement, url = excluded.url, last_seen = excluded.last_seen`,
+    ).bind(JSON.stringify(rows), source.provider, source.page, now),
+    env.DB.prepare(
+      `INSERT INTO source_status (id, last_run, last_ok, last_err, last_count) VALUES (?1, ?2, ?2, NULL, ?3)
+       ON CONFLICT(id) DO UPDATE SET last_run = ?2, last_ok = ?2, last_err = NULL, last_count = ?3`,
+    ).bind(source.id, now, rows.length),
+  ]);
+  return rows.length;
 }

@@ -1,4 +1,4 @@
-import type { Source } from "./types";
+import type { LifecycleSource, Source } from "./types";
 
 const rss = (id: string, name: string, lane: Source["lane"], tier: Source["tier"], url: string, aiFilter = false): Source => ({
   id, name, lane, tier, kind: "rss", url, aiFilter,
@@ -17,6 +17,12 @@ const release = (repo: string, name: string): Source => ({
 const trending = (id: string, name: string, path: string): Source => ({
   id, name, lane: "github", tier: 2, kind: "gh-trending", live: true, aiFilter: true,
   url: `https://github.com/trending${path}`,
+});
+
+/** Security advisories for the AI stack, newest first. One request per ecosystem. */
+const advisories = (id: string, name: string, ecosystem: string, packages: string[]): Source => ({
+  id, name, lane: "security", tier: 2, kind: "gh-advisory",
+  url: `https://api.github.com/advisories?ecosystem=${ecosystem}&affects=${packages.map(encodeURIComponent).join(",")}&sort=published&direction=desc&per_page=30`,
 });
 
 /** Add, remove or tune a source here; nothing else needs to change. */
@@ -81,6 +87,19 @@ export const SOURCES: Source[] = [
   sector("supplychain-dive", "Supply Chain Dive", 3, "https://www.supplychaindive.com/feeds/news/", "logistics"),
   sector("artificial-lawyer", "Artificial Lawyer", 3, "https://www.artificiallawyer.com/feed/", "legal"),
 
+  // Vulnerabilities in widely used AI libraries
+  advisories("sec-pip", "GitHub Advisory", "pip", [
+    "langchain", "langchain-core", "langchain-community", "langchain-openai", "langgraph", "llama-index", "llama-index-core",
+    "transformers", "huggingface-hub", "sentence-transformers", "vllm", "sglang", "torch", "keras", "onnxruntime", "openai",
+    "anthropic", "mcp", "litellm", "gradio", "mlflow", "ray", "crewai", "autogen-agentchat", "haystack-ai", "chromadb",
+    "qdrant-client", "ollama",
+  ]),
+  advisories("sec-npm", "GitHub Advisory", "npm", [
+    "@modelcontextprotocol/sdk", "langchain", "@langchain/core", "@langchain/community", "openai", "@anthropic-ai/sdk", "ai",
+    "ollama", "llamaindex", "@huggingface/transformers", "chromadb",
+  ]),
+  advisories("sec-go", "GitHub Advisory", "go", ["github.com/ollama/ollama", "github.com/tmc/langchaingo"]),
+
   // Tool releases to watch
   release("anthropics/claude-code", "Claude Code"),
   release("openai/codex", "Codex CLI"),
@@ -93,3 +112,10 @@ export const SOURCES: Source[] = [
 ];
 
 export const SOURCE_BY_ID = new Map(SOURCES.map((s) => [s.id, s]));
+
+/** Official model deprecation pages. Only definite shutdown dates are kept. */
+export const LIFECYCLE_SOURCES: LifecycleSource[] = [
+  { id: "life-openai", provider: "OpenAI", url: "https://developers.openai.com/api/docs/deprecations.md", page: "https://developers.openai.com/api/docs/deprecations" },
+  { id: "life-anthropic", provider: "Anthropic", url: "https://platform.claude.com/docs/en/about-claude/model-deprecations.md", page: "https://platform.claude.com/docs/en/about-claude/model-deprecations" },
+  { id: "life-gemini", provider: "Google Gemini", url: "https://ai.google.dev/gemini-api/docs/deprecations.md.txt", page: "https://ai.google.dev/gemini-api/docs/deprecations" },
+];

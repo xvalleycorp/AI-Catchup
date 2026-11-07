@@ -12,6 +12,7 @@ Toàn cảnh AI trên một trang: tin từ các lab, repo đang lên, model m�
 | Xu hướng | Số mục theo chủ đề trong 7 ngày, các model được nhiều nguồn nhắc đến. Bấm chủ đề để lọc cả trang |
 | 6 cột theo kênh | Lab, GitHub, Model, Paper, Cộng đồng, Báo chí và phân tích |
 | AI trong các ngành | So sánh 9 ngành, đào sâu ngân hàng theo hướng ứng dụng và tên ngân hàng |
+| Bảo mật & vòng đời | Lỗ hổng (GitHub Advisory) của khoảng 40 thư viện AI phổ biến, và lịch ngừng hỗ trợ model của OpenAI, Anthropic, Google Gemini |
 | Bản phát hành công cụ | Bản ổn định mới nhất của Claude Code, Codex CLI, Ollama, llama.cpp… |
 | Dòng thời gian | Xu hướng theo chủ đề và công ty, tích lũy từ ngày đầu thu thập |
 
@@ -19,7 +20,7 @@ Trình duyệt nhớ lần ghé trước và chấm đỏ các mục mới kể 
 
 Có hai giao diện, chuyển bằng nút trên thanh đầu trang (trình duyệt ghi nhớ lựa chọn):
 
-- **Terminal** (mặc định): toàn màn hình, không cuộn trang, gồm các khung [1] Không nên bỏ lỡ, [2] Tổng quan, [3] Ngân hàng & các ngành, [4] Tất cả tin. Phím 1–4 chọn khung, `/` mở dòng lệnh: `tìm <từ khóa>`, `ngành <tên>`, `chủ đề <tên>`, `công ty <tên>`, `khoảng 1|3|7|14`, `xóa`, `giao diện pro|terminal`, `help`.
+- **Terminal** (mặc định): toàn màn hình, không cuộn trang, gồm các khung [1] Không nên bỏ lỡ, [2] Tổng quan, [3] Ngân hàng & các ngành, [4] Tất cả tin, [5] Bảo mật & vòng đời. Phím 1–5 chọn khung, `/` mở dòng lệnh: `tìm <từ khóa>`, `ngành <tên>`, `chủ đề <tên>`, `công ty <tên>`, `khoảng 1|3|7|14`, `xóa`, `giao diện pro|terminal`, `help`.
 - **Professional**: trang cuộn, phong cách báo cáo phân tích, có chế độ sáng và tối.
 
 Bấm vào bất kỳ cột, thanh hoặc ô nào trên biểu đồ để mở danh sách tin tạo nên con số đó.

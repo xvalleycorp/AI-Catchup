@@ -126,6 +126,36 @@ it("offers both looks over one set of panes", () => {
   for (const id of ['id="pane-1"', 'id="pane-2"', 'id="pane-3"', 'id="skin-toggle"', 'id="cmd-form"', 'data-center-tab="all"']) expect(html).toContain(id);
 });
 
+it("counts down to model shutdowns with a text label, not colour alone", () => {
+  const s = build([item({ id: "a", source: "sec-pip", title: "vLLM: RCE", metric: "CAO · CVSS 8.1 · bản vá 0.32.0", summary: "vllm" })]);
+  s.lifecycle = [
+    { provider: "Anthropic", model: "claude-sonnet-4-5", retiresAt: NOW + 10 * 86_400_000, replacement: "claude-sonnet-5-5", url: "https://platform.claude.com/x" },
+    { provider: "OpenAI", model: "gpt-4o", retiresAt: NOW - 2 * 86_400_000, replacement: "", url: "https://developers.openai.com/x" },
+  ];
+  const html = renderPage(s, NOW);
+  expect(html).toContain("Còn 10 ngày");
+  expect(html).toContain("Đã ngừng");
+  expect(html).toContain('class="sev sev-high">CAO');
+  expect(html).toContain("1 lỗ hổng mức cao trở lên");
+});
+
+it("never shows a failed vulnerability fetch as an all-clear", () => {
+  const s = build([item({})]);
+  s.health = [{ id: "sec-pip", name: "GitHub Advisory", ok: false, lastOk: 0, err: "HTTP 403", count: 0 }];
+  const html = renderPage(s, NOW);
+  expect(html).toContain("chưa cập nhật được dữ liệu lỗ hổng");
+  expect(html).not.toContain("Không có lỗ hổng mới");
+});
+
+it("lists the most severe vulnerability first", () => {
+  const s = build([
+    item({ id: "a", url_key: "1", source: "sec-pip", title: "Low one", metric: "THẤP · CVSS 3.4", published_at: NOW - 1000 }),
+    item({ id: "b", url_key: "2", source: "sec-pip", title: "Critical one", metric: "NGHIÊM TRỌNG · CVSS 9.8", published_at: NOW - 5000 }),
+  ]);
+  const html = renderPage(s, NOW);
+  expect(html.indexOf("Critical one")).toBeLessThan(html.indexOf("Low one"));
+});
+
 it("escapes feed content and neutralises unsafe URLs", () => {
   const s = build([item({ title: `<img src=x onerror="alert(1)">`, url: "javascript:alert(1)", reasons: '["<b>"]' })]);
   const html = renderPage(s, NOW);

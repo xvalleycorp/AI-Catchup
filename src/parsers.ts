@@ -257,6 +257,106 @@ export function parseMeta(html: string): RawItem[] {
   return [...items.values()].slice(0, 20);
 }
 
+interface GhAdvisory {
+  ghsa_id: string;
+  html_url: string;
+  summary: string;
+  severity: string;
+  cvss?: { score: number | null } | null;
+  published_at: string;
+  withdrawn_at: string | null;
+  vulnerabilities?: { package?: { name?: string }; first_patched_version?: string | null }[];
+}
+
+export const SEVERITY_LABEL: Record<string, string> = { critical: "NGHIÊM TRỌNG", high: "CAO", medium: "TRUNG BÌNH", low: "THẤP" };
+const SEVERITY_SIGNAL: Record<string, number> = { critical: 95, high: 75, medium: 50, low: 20 };
+
+/** GitHub security advisories. Signal is CVSS x10, or a severity-based stand-in when no score is published. */
+export function parseAdvisories(json: string): RawItem[] {
+  const data = JSON.parse(json) as GhAdvisory[];
+  if (!Array.isArray(data)) throw new Error("GitHub Advisory: unexpected response");
+  return data.flatMap((a) => {
+    if (a.withdrawn_at || !a.summary || !/^https:\/\/github\.com\//.test(a.html_url)) return [];
+    const packages = [...new Set((a.vulnerabilities ?? []).map((v) => v.package?.name).filter((n): n is string => !!n))];
+    const main = packages[0] ?? "";
+    const short = main.split("/").pop() ?? main;
+    const summary = cleanText(a.summary, 180);
+    const title = !main || summary.toLowerCase().includes(short.toLowerCase()) ? summary : `${main}: ${summary}`;
+    const score = a.cvss?.score ?? null;
+    const patched = a.vulnerabilities?.find((v) => v.first_patched_version)?.first_patched_version;
+    const severity = SEVERITY_LABEL[a.severity] ? a.severity : "medium";
+    return [{
+      title,
+      url: a.html_url,
+      summary: packages.join(", "),
+      publishedAt: toMs(a.published_at),
+      signal: score !== null ? Math.round(score * 10) : SEVERITY_SIGNAL[severity]!,
+      metric: [SEVERITY_LABEL[severity], score !== null ? `CVSS ${score}` : "", patched ? `bản vá ${patched}` : "chưa có bản vá"].filter(Boolean).join(" · "),
+    }];
+  });
+}
+
+export interface LifecycleRow {
+  model: string;
+  retiresAt: number;
+  replacement: string;
+}
+
+/** Tables in a page, from Markdown pipes or Markdoc {% table %} blocks: [header, ...rows]. */
+function markdownTables(md: string): string[][][] {
+  const tables: string[][][] = [];
+  const lines = md.split("\n");
+  let pipe: string[][] = [];
+  const flushPipe = () => {
+    if (pipe.length >= 3) tables.push([pipe[0]!, ...pipe.slice(2)]);
+    pipe = [];
+  };
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith("|")) {
+      pipe.push(trimmed.replace(/\\\|/g, "/").replace(/^\||\|$/g, "").split("|").map((c) => c.trim()));
+    } else {
+      flushPipe();
+    }
+  }
+  flushPipe();
+  for (const block of md.matchAll(/\{%\s*table\s*%\}([\s\S]*?)\{%\s*\/table\s*%\}/g)) {
+    const rows = block[1]!.split(/^\s*---\s*$/m).map((chunk) =>
+      chunk.split("\n").filter((l) => /^\s*\*/.test(l)).map((l) => l.replace(/^\s*\*\s?/, "").trim()),
+    ).filter((r) => r.length > 0);
+    if (rows.length >= 2) tables.push(rows);
+  }
+  return tables;
+}
+
+const TENTATIVE = /not sooner|no earlier|to be announced|tbd|n\/a|no shutdown|not announced|earliest|^-$/i;
+
+function cleanCell(cell: string): string {
+  return cell.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/`/g, "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+}
+
+/** Definite shutdown dates from a provider's deprecations page. Tentative or unannounced dates are skipped. */
+export function parseLifecycle(md: string): LifecycleRow[] {
+  const found = new Map<string, LifecycleRow>();
+  for (const [header, ...rows] of markdownTables(md)) {
+    const h = header!.map((c) => cleanCell(c).toLowerCase());
+    const modelCol = h.findIndex((c) => /model|system/.test(c) && !/replace/.test(c));
+    const dateCol = h.findIndex((c) => /shutdown|retire/.test(c) && !/training/.test(c));
+    const replaceCol = h.findIndex((c) => /replace/.test(c));
+    if (modelCol < 0 || dateCol < 0) continue;
+    for (const row of rows) {
+      const model = cleanCell(row[modelCol] ?? "").slice(0, 100);
+      const when = cleanCell(row[dateCol] ?? "");
+      if (!model || !when || TENTATIVE.test(when)) continue;
+      const retiresAt = Date.parse(when);
+      if (Number.isNaN(retiresAt)) continue;
+      const replacement = replaceCol >= 0 ? cleanCell(row[replaceCol] ?? "").slice(0, 100) : "";
+      found.set(model, { model, retiresAt, replacement: TENTATIVE.test(replacement) ? "" : replacement });
+    }
+  }
+  return [...found.values()];
+}
+
 export function parseSource(source: Source, body: string): RawItem[] {
   switch (source.kind) {
     case "rss": return parseFeed(body);
@@ -270,5 +370,6 @@ export function parseSource(source: Source, body: string): RawItem[] {
     case "lobsters": return parseLobsters(body);
     case "anthropic": return parseAnthropic(body, source.url);
     case "meta": return parseMeta(body);
+    case "gh-advisory": return parseAdvisories(body);
   }
 }

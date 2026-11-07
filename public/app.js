@@ -783,7 +783,8 @@
       const showAll = lane.hasAttribute("data-all") || state.expanded.has(index);
       let matched = 0;
       for (const row of $$(".row", lane)) {
-        const ok = rowMatches(row);
+        // A status board (vulnerabilities) always shows its full window, so its headline count matches.
+        const ok = lane.hasAttribute("data-unfiltered") || rowMatches(row);
         if (ok) matched += 1;
         row.hidden = !ok || (!showAll && matched > LANE_LIMIT);
         const rank = $(".rank", row);
@@ -959,7 +960,7 @@
     const typing = event.target.closest?.("input, textarea, select, [contenteditable]");
     if (typing || event.metaKey || event.ctrlKey || event.altKey || skin() !== "terminal") return;
     if (event.key === "/") { event.preventDefault(); $("#cmd-input").focus(); return; }
-    if (["1", "2", "3", "4"].includes(event.key)) { event.preventDefault(); focusPane(event.key); }
+    if (["1", "2", "3", "4", "5"].includes(event.key)) { event.preventDefault(); focusPane(event.key); }
   });
 
   // ── Skins and panes ───────────────────────────────────────────────────────
@@ -980,7 +981,8 @@
   function focusPane(key) {
     if (key === "2") showCenter("overview");
     if (key === "4") showCenter("all");
-    const pane = document.getElementById(key === "4" ? "pane-2" : `pane-${key}`);
+    if (key === "5") showCenter("risk");
+    const pane = document.getElementById(key === "4" || key === "5" ? "pane-2" : `pane-${key}`);
     pane.focus({ preventScroll: skin() === "terminal" });
     if (skin() !== "terminal") pane.scrollIntoView({ behavior: "smooth" });
   }
