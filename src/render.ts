@@ -143,7 +143,7 @@ export function renderPage(s: Snapshot, now: number): string {
 </main>
 <footer class="foot">
   ${health(s, now)}
-  <p>Chọn lọc hoàn toàn bằng rule, không dùng AI. <a href="https://github.com/xvalleycorp/ai-catchup/blob/main/src/rules.ts" target="_blank" rel="noopener noreferrer">Xem rule</a> · <a href="https://github.com/xvalleycorp/ai-catchup" target="_blank" rel="noopener noreferrer">GitHub</a> · <a href="/api/snapshot.json">JSON</a></p>
+  <p>Chọn lọc hoàn toàn bằng rule, không dùng AI. <a href="https://github.com/xvalleycorp/AI-Catchup/blob/main/src/rules.ts" target="_blank" rel="noopener noreferrer">Xem rule</a> · <a href="https://github.com/xvalleycorp/AI-Catchup" target="_blank" rel="noopener noreferrer">GitHub</a> · <a href="/api/snapshot.json">JSON</a></p>
 </footer>`);
 }
 
