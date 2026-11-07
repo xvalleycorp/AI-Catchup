@@ -19,7 +19,7 @@ Trình duyệt nhớ lần ghé trước và chấm đỏ các mục mới kể 
 
 ## Nguồn dữ liệu
 
-54 nguồn, khai báo trong [`src/sources.ts`](src/sources.ts):
+52 nguồn, khai báo trong [`src/sources.ts`](src/sources.ts):
 
 - **Lab:** OpenAI, Anthropic (News, Engineering), Google DeepMind, Google AI, Meta AI, Mistral, Hugging Face, NVIDIA, Microsoft Research
 - **GitHub:** Trending (tất cả, Python, TypeScript, theo tuần), repo mới nổi qua Search API
@@ -28,7 +28,7 @@ Trình duyệt nhớ lần ghé trước và chấm đỏ các mục mới kể 
 - **Cộng đồng:** Hacker News, r/LocalLLaMA, r/MachineLearning, Lobsters
 - **Phân tích:** Latent Space / AINews, Simon Willison, Interconnects, Import AI, Ahead of AI
 - **Báo chí:** TechCrunch, The Verge, The Decoder, MIT Technology Review
-- **Ngân hàng và tài chính:** Finextra, Banking Dive, PYMNTS, BIS, FSB, VnEconomy, CafeF
+- **Ngân hàng và tài chính:** Finextra, Banking Dive, PYMNTS, BIS, FSB
 - **Các ngành khác:** Healthcare Dive, Higher Ed Dive, EdSurge, Retail Dive, Manufacturing Dive, Utility Dive, Supply Chain Dive, Artificial Lawyer
 - **Bản phát hành:** 8 dự án theo dõi qua GitHub Releases
 
@@ -51,12 +51,11 @@ Mọi rule nằm trong [`src/rules.ts`](src/rules.ts):
 1. **Liên quan:** nguồn tổng hợp (HN, GitHub Trending…) phải khớp từ khóa AI mới được giữ.
 2. **Chủ đề:** mỗi mục được gắn chủ đề bằng regex.
 3. **Điểm:** độ tin cậy của nguồn + tín hiệu (sao, điểm, upvote, theo thang log) + từ khóa phát hành − từ khóa nhiễu, rồi giảm dần theo thời gian.
-4. **Không nên bỏ lỡ:** một mục được chọn khi có ít nhất một trong các lý do sau:
+4. **Không nên bỏ lỡ:** ưu tiên những gì một Enterprise Architect trong ngân hàng cần hành động: quy định và giám sát, rủi ro bảo mật, thương vụ lớn, thay đổi nền tảng doanh nghiệp của nhà cung cấp, ngân hàng triển khai AI. Các lý do này được cộng điểm để xếp trên độ phổ biến. Ngoài ra một mục cũng được chọn khi:
    - Lab công bố model hoặc sản phẩm mới
    - HN từ 300 điểm, Lobsters từ 40 điểm
-   - Repo tăng từ 800 sao/ngày hoặc 4.000 sao/tuần, repo mới từ 3.000 sao
-   - Model có HF trending từ 300, hoặc model mới của lab lớn trên OpenRouter
-   - Paper từ 50 upvote
+   - Repo tăng từ 2.000 sao/ngày hoặc 12.000 sao/tuần
+   - Model mở mới từ lab lớn (HF trending từ 300), hoặc model mới của lab lớn trên OpenRouter
    - Từ 3 nguồn cùng nhắc một model có phiên bản
 
    Mỗi kênh có giới hạn số mục (`MUST_LANE_CAP`) để không kênh nào chiếm hết danh sách.

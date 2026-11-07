@@ -1,6 +1,6 @@
 import type { Row, Snapshot } from "./types";
 
-const ASSET_VERSION = "4";
+const ASSET_VERSION = "5";
 
 /** Next run of the 08:00 / 16:00 Vietnam schedule in wrangler.jsonc. */
 const SCAN_HOURS_VN = [8, 16];
@@ -77,31 +77,33 @@ function charts(s: Snapshot): string {
   if (!s.story) return "";
   const data = JSON.stringify(s.story).replace(/</g, "\\u003c");
   const entities = s.entities.length
-    ? `<section class="card chart" id="entities"><p class="eyebrow">Tên đang nổi</p><h3 class="finding">Model được nhắc đến nhiều nơi cùng lúc</h3><ul class="entities">${s.entities.map((e) => `<li>${externalLink(e.url, esc(e.name))}<span>${e.sources} trang tin</span></li>`).join("")}</ul><p class="caption">Số trang tin khác nhau cùng nhắc tới một model trong 72 giờ qua.</p></section>`
+    ? `<section class="card chart" id="entities"><p class="eyebrow">Biểu đồ 7 · Tên đang nổi</p><h3 class="finding">Model được nhắc đến nhiều nơi cùng lúc</h3><ul class="entities">${s.entities.map((e) => `<li>${externalLink(e.url, esc(e.name))}<span>${e.sources} trang tin</span></li>`).join("")}</ul><p class="caption">Số trang tin khác nhau cùng nhắc tới một model trong 72 giờ qua.</p></section>`
     : "";
   return `<script type="application/json" id="story-data">${data}</script>
-  <div class="section-head"><p class="eyebrow">Câu chuyện dữ liệu</p><h2>Điều gì đang diễn ra</h2><p>Bấm vào một ngày, chủ đề hay công ty để lọc cả trang.</p></div>
+  <div class="section-head"><p class="eyebrow">Toàn cảnh</p><h2>Điều gì đang diễn ra</h2><p>Bấm vào một ngày, chủ đề, công ty hoặc ngành để lọc cả trang.</p></div>
   <noscript><p class="caption">Bật JavaScript để xem biểu đồ. Danh sách tin bên dưới vẫn đọc được bình thường.</p></noscript>
   <div class="bento">
-    ${chart("flow", "01 · Nhịp tin", "Nhịp tin 14 ngày", "span-7")}
-    ${chart("orgs", "02 · Ai được nhắc", "Công ty được nhắc nhiều nhất", "span-5")}
-    ${chart("heat", "03 · Chủ đề", "Chủ đề theo từng ngày", "span-12")}
-    ${chart("timeline", "04 · Dòng thời gian", "Xu hướng theo thời gian", "span-12")}
-    ${chart("momentum", "05 · Đà tăng", "Dự án và model đang tăng nhanh", "span-5")}
-    ${chart("debate", "06 · Tranh luận", "Điều gì khiến cộng đồng tranh luận", "span-7")}
+    ${chart("flow", "Biểu đồ 1 · Nhịp tin", "Nhịp tin 14 ngày", "span-7")}
+    ${chart("orgs", "Biểu đồ 2 · Mức độ được nhắc đến", "Công ty được nhắc nhiều nhất", "span-5")}
+    ${chart("heat", "Biểu đồ 3 · Chủ đề theo ngày", "Chủ đề theo từng ngày", "span-12")}
+    ${chart("timeline", "Biểu đồ 4 · Dòng thời gian", "Xu hướng theo thời gian", "span-12")}
+    ${chart("momentum", "Biểu đồ 5 · Đà tăng", "Dự án và model đang tăng nhanh", "span-5")}
+    ${chart("debate", "Biểu đồ 6 · Thảo luận", "Điều gì khiến cộng đồng tranh luận", "span-7")}
     ${entities ? entities.replace('class="card chart"', 'class="card chart span-12"') : ""}
   </div>`;
 }
 
 function sectors(s: Snapshot, now: number): string {
   if (!s.story?.sectors) return "";
-  return `<div class="section-head"><p class="eyebrow">AI trong các ngành</p><h2>AI đang được ứng dụng ở đâu</h2><p>Trọng tâm: ngân hàng và tài chính.</p></div>
+  return `<section class="feature">
+  <div class="section-head"><p class="eyebrow">Chuyên đề</p><h2>AI trong ngân hàng và các ngành</h2></div>
   <div class="bento">
-    ${chart("sectors", "07 · Theo ngành", "Tin về ứng dụng AI theo ngành", "span-5")}
-    ${chart("banking", "08 · Ngân hàng", "AI trong ngân hàng", "span-7")}
+    ${chart("sectors", "Chuyên đề · Theo ngành", "Tin về ứng dụng AI theo ngành", "span-5")}
+    ${chart("banking", "Chuyên đề · Ngân hàng", "AI trong ngân hàng", "span-7")}
     ${lane("Tin AI trong ngân hàng & tài chính", s.banking ?? [], now, "span-7")}
     ${lane("Ứng dụng ở các ngành khác", s.lanes.industry.filter((r) => r.sectors.length > 0 && !r.sectors.includes("banking")), now, "span-5")}
-  </div>`;
+  </div>
+  </section>`;
 }
 
 function tools(s: Snapshot, now: number): string {
@@ -126,7 +128,7 @@ function shell(body: string): string {
 <meta name="description" content="Toàn cảnh AI bằng dữ liệu: tin, model, repo và paper mới nhất trên một trang.">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <link rel="stylesheet" href="/app.css?v=${ASSET_VERSION}">
 <script src="/theme.js?v=${ASSET_VERSION}"></script>
 <script src="/app.js?v=${ASSET_VERSION}" defer></script>
@@ -142,46 +144,49 @@ export function renderPage(s: Snapshot, now: number): string {
     ? s.story.headline.map((h) => (h.em ? `<em>${esc(h.text)}</em>` : esc(h.text))).join("")
     : "Toàn cảnh AI, cập nhật hai lần mỗi ngày.";
   return shell(`
-<header class="bar">
-  <a class="logo" href="/"><span class="logo-mark" aria-hidden="true"></span>AI Catchup</a>
-  <div class="range" role="group" aria-label="Khoảng thời gian">
-    <button type="button" data-range="1" aria-pressed="false">24 giờ</button>
-    <button type="button" data-range="3" aria-pressed="false">3 ngày</button>
-    <button type="button" data-range="7" aria-pressed="true">7 ngày</button>
-    <button type="button" data-range="14" aria-pressed="false">14 ngày</button>
-  </div>
-  <div class="active" id="active-filters" aria-live="polite"></div>
-  <div class="bar-end">
-    <p class="unread" id="unread" hidden><b id="unread-count"></b> mục mới <button type="button" id="mark-read">Đã xem hết</button></p>
-    <button type="button" class="theme" id="theme-toggle" aria-label="Đổi giao diện sáng tối">◐</button>
-  </div>
-</header>
-<main>
-  <section class="hero">
+<div class="masthead">
+  <header class="bar"><div class="bar-inner">
+    <a class="logo" href="/">AI Catchup</a>
+    <span class="bar-meta">Cập nhật ${esc(updated)} · Lần tiếp theo lúc ${esc(nextScanLabel(now))}</span>
+    <div class="range" role="group" aria-label="Khoảng thời gian">
+      <button type="button" data-range="1" aria-pressed="false">24 giờ</button>
+      <button type="button" data-range="3" aria-pressed="false">3 ngày</button>
+      <button type="button" data-range="7" aria-pressed="true">7 ngày</button>
+      <button type="button" data-range="14" aria-pressed="false">14 ngày</button>
+    </div>
+    <div class="active" id="active-filters" aria-live="polite"></div>
+    <div class="bar-end">
+      <p class="unread" id="unread" hidden><b id="unread-count"></b> mục mới <button type="button" id="mark-read">Đã xem hết</button></p>
+      <button type="button" class="theme" id="theme-toggle" aria-label="Đổi giao diện sáng tối">◐</button>
+    </div>
+  </div></header>
+  <section class="hero wrap">
     <div class="hero-copy">
-      <p class="eyebrow">Cập nhật ${esc(updated)} · Lần tiếp theo lúc ${esc(nextScanLabel(now))}</p>
+      <p class="eyebrow">Điểm chính hôm nay</p>
       <h1>${headline}</h1>
       ${s.story?.deck ? `<p class="deck">${esc(s.story.deck)}</p>` : ""}
     </div>
     <div class="kpis">
-      <div class="kpi kpi-hero"><span class="kpi-label">Tin mới trong <span data-kpi-range></span></span><span class="kpi-value" id="kpi-items">–</span><span class="kpi-note">Tin tức, bài viết và nghiên cứu</span></div>
+      <div class="kpi"><span class="kpi-label">Tin mới trong <span data-kpi-range></span></span><span class="kpi-value" id="kpi-items">–</span></div>
       <div class="kpi"><span class="kpi-label">Không nên bỏ lỡ</span><span class="kpi-value" id="kpi-must">${s.must.length}</span></div>
       <div class="kpi"><span class="kpi-label">Dự án tăng nhanh nhất</span><span class="kpi-value" id="kpi-repo">${s.story?.momentum.today[0] ? `+${s.story.momentum.today[0].v.toLocaleString("en-US")}` : "–"}</span><span class="kpi-note">${esc(s.story?.momentum.today[0]?.n ?? "")}</span></div>
-      <div class="kpi"><span class="kpi-label">Chủ đề lớn nhất</span><span class="kpi-value kpi-text">${esc(s.topics[0]?.label ?? "–")}</span></div>
+      <div class="kpi"><span class="kpi-label">Chủ đề lớn nhất</span><span class="kpi-value kpi-text">${esc(s.topics[0]?.label ?? "–")}</span><span class="kpi-note">${s.topics[0] ? `${s.topics[0].count} tin` : ""}</span></div>
     </div>
   </section>
+</div>
+<main>
 
   <section class="must" data-lane data-all>
-    <div class="section-head"><p class="eyebrow">Đọc trước</p><h2>Không nên bỏ lỡ</h2><p>Những diễn biến đáng chú ý nhất lúc này.</p></div>
+    <div class="section-head"><h2>Không nên bỏ lỡ</h2></div>
     <ol class="rows">${s.must.map((r) => mustRow(r, now)).join("")}</ol>
     <p class="empty"${s.must.length ? " hidden" : ""}>Không có mục quan trọng nào khớp bộ lọc.</p>
   </section>
 
-  ${charts(s)}
-
   ${sectors(s, now)}
 
-  <div class="section-head"><p class="eyebrow">Đọc theo kênh</p><h2>Tất cả tin</h2></div>
+  ${charts(s)}
+
+  <div class="section-head"><h2>Tất cả tin</h2></div>
   <div class="grid">${lanes}</div>
   ${tools(s, now)}
 </main>

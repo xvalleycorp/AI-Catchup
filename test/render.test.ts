@@ -51,6 +51,7 @@ it("gives one model launch a single must-see slot", () => {
 it("caps must-see per lane", () => {
   const items = Array.from({ length: 6 }, (_, i) => item({ id: `h${i}`, url_key: `k${i}`, title: `Story ${i}`, reasons: '["x"]' }));
   expect(build(items).must).toHaveLength(2);
+  expect(build(items.map((i) => ({ ...i, source: "hf-papers" }))).must).toHaveLength(0);
 });
 
 it("caps a prolific source within its lane", () => {

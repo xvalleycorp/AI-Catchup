@@ -32,8 +32,29 @@ describe("classify", () => {
   it("does not promote a customer story or a weekly total at the daily threshold", () => {
     expect(classify({ title: "Cult.fit builds operational muscle with Codex", url: "https://x" }, lab).reasons).toEqual([]);
     const week = src({ id: "gh-trend-week", kind: "gh-trending", lane: "github" });
-    expect(classify({ title: "a/b", url: "https://x", signal: 3000 }, week).reasons).toEqual([]);
-    expect(classify({ title: "a/b", url: "https://x", signal: 4000 }, week).reasons).toEqual(["+4,000 sao trong tuần"]);
+    expect(classify({ title: "a/b", url: "https://x", signal: 8000 }, week).reasons).toEqual([]);
+    expect(classify({ title: "a/b", url: "https://x", signal: 12000 }, week).reasons).toEqual(["+12,000 sao trong tuần"]);
+  });
+
+  it("puts what an architect must act on first", () => {
+    const news = src({ name: "The Verge", lane: "news", tier: 3 });
+    const deal = classify({ title: "OpenAI valued at $1.25 trillion, as rival Anthropic nears its IPO", url: "https://x" }, news);
+    expect(deal.reasons).toEqual(["Thương vụ lớn"]);
+    expect(deal.baseScore).toBeGreaterThan(classify({ title: "Some AI opinion piece", url: "https://x" }, news).baseScore + 15);
+    const hn = src({ kind: "hn", aiFilter: true, lane: "community" });
+    expect(classify({ title: "Claude Code sends your email address to websites", url: "https://x", signal: 120 }, hn).reasons).toEqual(["Rủi ro bảo mật"]);
+    const fsb = src({ name: "FSB", lane: "industry", sector: "banking" });
+    expect(classify({ title: "FSB finalises sound practices for the responsible adoption of AI", url: "https://x" }, fsb).reasons).toEqual(["Quy định & giám sát"]);
+    const fin = src({ name: "Finextra", lane: "industry", sector: "banking" });
+    expect(classify({ title: "BMO launches AI agent to help credit card customers", url: "https://x" }, fin).reasons).toEqual(["Ngân hàng triển khai AI"]);
+  });
+
+  it("ignores popular community fine-tunes and papers", () => {
+    const hf = src({ kind: "hf-models", lane: "models" });
+    expect(classify({ title: "ccore/Qwen3.5-4B-3D-Coder", url: "https://x", signal: 415 }, hf).reasons).toEqual([]);
+    expect(classify({ title: "moonshotai/Kimi-K3.1-Pro", url: "https://x", signal: 1023 }, hf).reasons).toEqual(["Model mở mới từ lab lớn"]);
+    const papers = src({ kind: "hf-papers", lane: "papers" });
+    expect(classify({ title: "SLA: Scaling robots", url: "https://x", signal: 150 }, papers).reasons).toEqual([]);
   });
 
   it("flags a named Gemini tier and drops HF re-uploads", () => {
@@ -111,7 +132,6 @@ it("reads banking themes and bank names from titles", () => {
   const title = "JPMorgan Chase signs cybersecurity and coding deal with OpenAI";
   expect(BANK_THEMES.filter((x) => x.re.test(title)).map((x) => x.key)).toEqual(["cyber"]);
   expect(BANKS.filter((x) => x.re.test(title)).map((x) => x.label)).toEqual(["JPMorgan"]);
-  expect(BANKS.filter((x) => x.re.test("VPBank và Techcombank ứng dụng AI")).map((x) => x.label)).toEqual(["Techcombank", "VPBank"]);
 });
 
 it("recognises Vietnamese AI wording", () => {

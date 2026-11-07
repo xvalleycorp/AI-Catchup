@@ -101,9 +101,6 @@ export const BANKS: { label: string; re: RegExp }[] = [
   { label: "Bank of America", re: /Bank of America|\bBofA\b/i }, { label: "Citi", re: /\bCiti(group|bank)?\b/ }, { label: "Wells Fargo", re: /Wells Fargo/i },
   { label: "HSBC", re: /\bHSBC\b/ }, { label: "BMO", re: /\bBMO\b/ }, { label: "Barclays", re: /Barclays/i }, { label: "Revolut", re: /Revolut/i },
   { label: "Standard Chartered", re: /Standard Chartered/i }, { label: "Commonwealth Bank", re: /Commonwealth Bank|\bCBA\b/ },
-  { label: "Vietcombank", re: /Vietcombank/i }, { label: "BIDV", re: /\bBIDV\b/ }, { label: "VietinBank", re: /VietinBank/i },
-  { label: "Techcombank", re: /Techcombank/i }, { label: "VPBank", re: /VPBank/i }, { label: "MB", re: /\bMB ?Bank\b/i },
-  { label: "ACB", re: /\bACB\b/ }, { label: "TPBank", re: /TPBank/i }, { label: "HDBank", re: /HDBank/i },
 ];
 
 // ── 3. Importance ────────────────────────────────────────────────────────────
@@ -114,23 +111,58 @@ const NOISE = /customer stor|case study|webinar|\bhow .{2,40} uses?\b|scholarshi
 const HF_REUPLOAD = /uncensored|abliterated|heretic|-GGUF\b|-GSQ\b|-MLX\b|\d+bit\b/i;
 const MAJOR_MODEL_PROVIDER = /^(OpenAI|Anthropic|Google|Meta|Mistral|DeepSeek|Qwen|Alibaba|xAI|Moonshot|MoonshotAI|Z\.?ai|MiniMax|NVIDIA|Microsoft|Amazon)\b/i;
 
+/**
+ * What an enterprise architect in banking needs to act on. Each match is a must-see
+ * reason and lifts the story above pure popularity.
+ */
+export const ARCHITECT_SIGNALS: { label: string; re: RegExp; lanes: Lane[] }[] = [
+  {
+    label: "Quy định & giám sát",
+    re: /\b(regulat\w*|circular|guidance|guidelines?|supervis\w*|sound practices|AI Act|rulemaking|consultation paper|central banks?)\b/i,
+    lanes: ["labs", "news", "industry", "community"],
+  },
+  {
+    label: "Rủi ro bảo mật",
+    re: /vulnerab\w*|\bleak(s|ed)?\b|\bbreach\w*|\bexploit\w*|\bCVE-\d|prompt injection|jailbreak\w*|malware|sends your (email|data)|passes data|data exposure|security flaw/i,
+    lanes: ["labs", "news", "industry", "community"],
+  },
+  {
+    label: "Thương vụ lớn",
+    re: /\b(acquires?|acquired|acquisition|to acquire|to buy|IPO|S-1|valuation|valued at|raises? \$[\d.]+ ?(billion|bn|B)\b)/i,
+    lanes: ["labs", "news", "industry"],
+  },
+  {
+    label: "Thay đổi nền tảng doanh nghiệp",
+    re: /\b(enterprise|general availability|now available|pricing|deprecat\w*|retir(e|es|ing)|sunset|end of life|data residency|on-prem\w*|sovereign|private cloud|GovCloud)\b/i,
+    lanes: ["labs"],
+  },
+];
+
+/** A bank, named, putting AI to work. */
+const BANK_DEPLOYMENT = /\b(launch\w*|deploy\w*|roll(s|ed|ing)? out|partner\w*|signs?|adopt\w*|turns? to|uses?)\b/i;
+
+/** Hugging Face orgs whose releases matter; anyone else's fine-tune is noise for this reader. */
+const MAJOR_MODEL_ORGS = /^(openai|google|meta-llama|facebook|microsoft|nvidia|mistralai|deepseek-ai|Qwen|moonshotai|zai-org|THUDM|MiniMaxAI|ibm-granite|LiquidAI|allenai|xai-org|baidu|tencent|stepfun-ai)\//;
+
+/** How much an architect-relevant reason outranks popularity. */
+const ARCHITECT_BOOST = 18;
+
 /** Signal level at which an item becomes "must-see" on its own. */
 export const MUST_THRESHOLD: Partial<Record<Source["kind"], { min: number; label: (n: number) => string }>> = {
   hn: { min: 300, label: (n) => `${n} điểm trên Hacker News` },
   lobsters: { min: 40, label: (n) => `${n} điểm trên Lobsters` },
-  "gh-trending": { min: 800, label: (n) => `+${n.toLocaleString("en-US")} sao` },
-  "gh-search": { min: 3000, label: (n) => `Dự án mới ${n.toLocaleString("en-US")} sao` },
-  "hf-models": { min: 300, label: () => "Model đang hot" },
-  "hf-papers": { min: 50, label: (n) => `${n} lượt bình chọn` },
+  "gh-trending": { min: 2000, label: (n) => `+${n.toLocaleString("en-US")} sao` },
+  "gh-search": { min: 20000, label: (n) => `Dự án mới ${n.toLocaleString("en-US")} sao` },
+  "hf-models": { min: 300, label: () => "Model mở mới từ lab lớn" },
 };
 
 const TIER_BASE: Record<Source["tier"], number> = { 1: 50, 2: 28, 3: 18 };
 
 /** A weekly total is not comparable with a daily one. */
-const WEEKLY_THRESHOLD_FACTOR = 5;
+const WEEKLY_THRESHOLD_FACTOR = 6;
 
 /** Keeps any one channel from filling the must-see list, however large its numbers are. */
-export const MUST_LANE_CAP: Record<Lane, number> = { labs: 4, github: 2, models: 2, community: 2, papers: 1, news: 2, tools: 1, industry: 1 };
+export const MUST_LANE_CAP: Record<Lane, number> = { labs: 4, github: 1, models: 1, community: 2, papers: 0, news: 3, tools: 0, industry: 3 };
 
 /** Prolific sources (OpenAI publishes daily) must not bury the others in their column. */
 export const LANE_SOURCE_CAP: Partial<Record<Lane, number>> = { labs: 6, news: 6, community: 18, industry: 6 };
@@ -163,10 +195,18 @@ export function classify(item: RawItem, source: Source): Classified {
   if (noisy) score -= 15;
 
   const reasons: string[] = [];
+  for (const s of ARCHITECT_SIGNALS) {
+    if (s.lanes.includes(source.lane) && s.re.test(item.title)) reasons.push(s.label);
+  }
+  if (sectorsOf(item.title, source).includes("banking") && BANKS.some((b) => b.re.test(item.title)) && BANK_DEPLOYMENT.test(item.title)) {
+    reasons.push("Ngân hàng triển khai AI");
+  }
+  if (reasons.length) score += ARCHITECT_BOOST;
   const threshold = MUST_THRESHOLD[source.kind];
   const minSignal = threshold ? threshold.min * (source.id === "gh-trend-week" ? WEEKLY_THRESHOLD_FACTOR : 1) : 0;
-  if (threshold && signal >= minSignal) reasons.push(`${threshold.label(signal)}${source.id === "gh-trend-week" ? " trong tuần" : ""}`);
-  if (source.lane === "labs" && source.tier === 1 && !noisy && (release || hasModel)) reasons.push(`${source.name} công bố`);
+  const popularEnough = threshold && signal >= minSignal && (source.kind !== "hf-models" || MAJOR_MODEL_ORGS.test(item.title));
+  if (popularEnough) reasons.push(`${threshold.label(signal)}${source.id === "gh-trend-week" ? " trong tuần" : ""}`);
+  if (source.lane === "labs" && source.tier === 1 && !noisy && (release || hasModel) && !reasons.length) reasons.push(`${source.name} công bố`);
   if (source.kind === "openrouter" && MAJOR_MODEL_PROVIDER.test(item.title)) reasons.push("Model mới");
 
   return { keep: true, topics: topicsOf(text), baseScore: Math.round(score * 10) / 10, reasons };

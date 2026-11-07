@@ -70,8 +70,6 @@ export const SOURCES: Source[] = [
   sector("pymnts", "PYMNTS", 3, "https://www.pymnts.com/category/artificial-intelligence-2/feed/", undefined, false),
   sector("bis-fsi", "BIS", 2, "https://www.bis.org/doclist/bis_fsi_publs.rss", "banking"),
   sector("fsb", "FSB", 2, "https://www.fsb.org/feed/", "banking"),
-  sector("vneconomy-fin", "VnEconomy", 3, "https://vneconomy.vn/tai-chinh.rss", "banking"),
-  sector("cafef-bank", "CafeF", 3, "https://cafef.vn/tai-chinh-ngan-hang.rss", "banking"),
 
   // AI in other industries: one trade publication each
   sector("healthcare-dive", "Healthcare Dive", 3, "https://www.healthcaredive.com/feeds/news/", "health"),
