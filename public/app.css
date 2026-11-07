@@ -258,6 +258,27 @@ html:not(.js) .lane .row:nth-child(n+7) { display: none; }
 .tool time { color: var(--ink-3); font-size: 12.5px; font-weight: 400; white-space: nowrap; }
 .tool.is-new a { color: var(--accent-ink); }
 
+/* Detail drawer */
+.kpi-button { text-align: left; color: inherit; cursor: pointer; }
+.kpi-button .kpi-note { text-decoration: underline; text-underline-offset: 2px; }
+.kpi-button:hover .kpi-value { color: #f2a97e; }
+.bank-name { display: flex; justify-content: space-between; gap: 8px; width: 100%; min-height: 36px; padding: 6px 4px; text-align: left; font-size: 14px; }
+.bank-name:hover { background: var(--panel-2); }
+.bank-names li { padding: 0; }
+.drawer { position: fixed; z-index: 45; top: 0; right: 0; bottom: 0; width: min(460px, 100vw); overflow-y: auto; background: var(--page); color: var(--ink); border-left: 3px solid var(--navy); box-shadow: -16px 0 40px -20px rgba(0, 0, 0, .45); }
+.drawer-head { position: sticky; top: 0; display: flex; justify-content: space-between; gap: 12px; padding: 18px 20px 14px; background: var(--page); border-bottom: 1px solid var(--line); }
+.drawer-head h2 { margin-top: 2px; font-family: var(--serif); font-weight: 600; font-size: 23px; line-height: 1.2; outline: none; }
+.drawer-sub { margin-top: 4px; font-size: 13px; color: var(--ink-3); }
+.drawer-close { flex: none; width: 44px; height: 44px; font-size: 26px; line-height: 1; color: var(--ink-2); }
+.drawer-close:hover { background: var(--panel); }
+.drawer-list { padding: 4px 20px 32px; }
+.drawer-row { padding: 12px 0; border-bottom: 1px solid var(--line); }
+.drawer-link { font-family: var(--serif); font-weight: 600; font-size: 17px; line-height: 1.3; overflow-wrap: anywhere; }
+.drawer-meta { margin-top: 4px; font-size: 12.5px; color: var(--ink-3); }
+@media (max-width: 720px) {
+  .drawer { top: auto; width: 100vw; height: 82vh; border-left: 0; border-top: 3px solid var(--navy); }
+}
+
 .tooltip { position: fixed; z-index: 40; display: flex; flex-direction: column; gap: 1px; max-width: 300px; padding: 8px 11px; border-radius: 3px; pointer-events: none; background: var(--navy); color: #fff; box-shadow: 0 8px 24px -8px rgba(0, 0, 0, .45); font-size: 12.5px; line-height: 1.35; }
 .tooltip strong { font-size: 14.5px; font-weight: 600; }
 .tooltip small { opacity: .78; font-size: 11.5px; }

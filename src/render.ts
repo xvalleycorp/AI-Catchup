@@ -1,6 +1,6 @@
 import type { Row, Snapshot } from "./types";
 
-const ASSET_VERSION = "5";
+const ASSET_VERSION = "6";
 
 /** Next run of the 08:00 / 16:00 Vietnam schedule in wrangler.jsonc. */
 const SCAN_HOURS_VN = [8, 16];
@@ -80,7 +80,7 @@ function charts(s: Snapshot): string {
     ? `<section class="card chart" id="entities"><p class="eyebrow">Biểu đồ 7 · Tên đang nổi</p><h3 class="finding">Model được nhắc đến nhiều nơi cùng lúc</h3><ul class="entities">${s.entities.map((e) => `<li>${externalLink(e.url, esc(e.name))}<span>${e.sources} trang tin</span></li>`).join("")}</ul><p class="caption">Số trang tin khác nhau cùng nhắc tới một model trong 72 giờ qua.</p></section>`
     : "";
   return `<script type="application/json" id="story-data">${data}</script>
-  <div class="section-head"><p class="eyebrow">Toàn cảnh</p><h2>Điều gì đang diễn ra</h2><p>Bấm vào một ngày, chủ đề, công ty hoặc ngành để lọc cả trang.</p></div>
+  <div class="section-head"><p class="eyebrow">Toàn cảnh</p><h2>Điều gì đang diễn ra</h2><p>Bấm vào một cột, thanh hoặc ô để xem danh sách tin tạo nên con số đó.</p></div>
   <noscript><p class="caption">Bật JavaScript để xem biểu đồ. Danh sách tin bên dưới vẫn đọc được bình thường.</p></noscript>
   <div class="bento">
     ${chart("flow", "Biểu đồ 1 · Nhịp tin", "Nhịp tin 14 ngày", "span-7")}
@@ -167,7 +167,7 @@ export function renderPage(s: Snapshot, now: number): string {
       ${s.story?.deck ? `<p class="deck">${esc(s.story.deck)}</p>` : ""}
     </div>
     <div class="kpis">
-      <div class="kpi"><span class="kpi-label">Tin mới trong <span data-kpi-range></span></span><span class="kpi-value" id="kpi-items">–</span></div>
+      <button type="button" class="kpi kpi-button" id="kpi-items-button"><span class="kpi-label">Tin mới trong <span data-kpi-range></span></span><span class="kpi-value" id="kpi-items">–</span><span class="kpi-note">Xem danh sách</span></button>
       <div class="kpi"><span class="kpi-label">Không nên bỏ lỡ</span><span class="kpi-value" id="kpi-must">${s.must.length}</span></div>
       <div class="kpi"><span class="kpi-label">Dự án tăng nhanh nhất</span><span class="kpi-value" id="kpi-repo">${s.story?.momentum.today[0] ? `+${s.story.momentum.today[0].v.toLocaleString("en-US")}` : "–"}</span><span class="kpi-note">${esc(s.story?.momentum.today[0]?.n ?? "")}</span></div>
       <div class="kpi"><span class="kpi-label">Chủ đề lớn nhất</span><span class="kpi-value kpi-text">${esc(s.topics[0]?.label ?? "–")}</span><span class="kpi-note">${s.topics[0] ? `${s.topics[0].count} tin` : ""}</span></div>
@@ -190,6 +190,13 @@ export function renderPage(s: Snapshot, now: number): string {
   <div class="grid">${lanes}</div>
   ${tools(s, now)}
 </main>
+<aside class="drawer" id="drawer" aria-labelledby="drawer-title" hidden>
+  <header class="drawer-head">
+    <div><p class="eyebrow">Chi tiết</p><h2 id="drawer-title" tabindex="-1"></h2><p class="drawer-sub" id="drawer-sub"></p></div>
+    <button type="button" class="drawer-close" id="drawer-close" aria-label="Đóng danh sách">×</button>
+  </header>
+  <ol class="drawer-list" id="drawer-list"></ol>
+</aside>
 <div class="tooltip" id="tooltip" role="status" hidden><strong></strong><span></span><small></small></div>
 <footer class="foot"><p>AI Catchup · Cập nhật mỗi ngày lúc 8:00 và 16:00</p></footer>`);
 }

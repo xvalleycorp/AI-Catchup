@@ -17,6 +17,12 @@
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
   const fmt = (n) => Number(n).toLocaleString("en-US");
+  function relative(t) {
+    const min = Math.max(0, Math.round((now - t) / 60000));
+    if (min < 60) return `${Math.max(1, min)} phút`;
+    const h = Math.round(min / 60);
+    return h < 24 ? `${h} giờ` : `${Math.round(h / 24)} ngày`;
+  }
   const dayOf = (ms) => Math.floor((ms + VN_OFFSET) / DAY);
   const dayLabel = (day) => {
     const d = new Date(day * DAY);
@@ -106,6 +112,63 @@
   document.addEventListener("focusout", () => { tooltip.hidden = true; });
   document.addEventListener("scroll", () => { tooltip.hidden = true; }, { passive: true });
 
+  // ── Detail drawer: the stories behind any number ─────────────────────────
+  const drawer = $("#drawer");
+  let drawerReturn = null;
+  let drawerReturnKey = null;
+  const RETURN_KEYS = ['sector', 'org', 'topic', 'day', 'bankTheme', 'bank'];
+
+  function closeDrawer() {
+    if (drawer.hidden) return;
+    drawer.hidden = true;
+    document.documentElement.classList.remove("drawer-open");
+    // Charts redraw on selection, so the clicked mark may be a fresh node with the same data.
+    let back = drawerReturn;
+    if (back && !document.contains(back) && drawerReturnKey) back = document.querySelector(drawerReturnKey);
+    if (back) back.focus();
+    drawerReturn = null;
+    drawerReturnKey = null;
+  }
+
+  /** entries: [{ t (ms), n (title), u (url), s (publisher) }] */
+  function openDrawer(title, sub, entries, note) {
+    drawerReturn = document.activeElement;
+    const ds = drawerReturn?.dataset || {};
+    drawerReturnKey = RETURN_KEYS.filter((k) => ds[k] !== undefined)
+      .map((k) => '[data-' + k.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase()) + '="' + CSS.escape(ds[k]) + '"]').join('') || null;
+    if (drawerReturnKey) drawerReturnKey = '.' + drawerReturn.className.split(' ')[0] + drawerReturnKey;
+    $("#drawer-title").textContent = title;
+    $("#drawer-sub").textContent = `${sub} · ${fmt(entries.length)} tin${note ? `. ${note}` : ""}`;
+    const list = $("#drawer-list");
+    list.replaceChildren();
+    for (const e of [...entries].sort((a, b) => b.t - a.t)) {
+      const li = el("li", "drawer-row");
+      const a = el("a", "drawer-link", e.n);
+      a.href = /^https?:\/\//i.test(e.u) ? e.u : "#";
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      const meta = el("p", "drawer-meta");
+      meta.append(el("span", "src", e.s), document.createTextNode(` · ${relative(e.t)} trước · ${dayLabel(dayOf(e.t))}`));
+      li.append(a, meta);
+      list.append(li);
+    }
+    if (!entries.length) list.append(el("li", "empty", "Không có tin nào."));
+    drawer.hidden = false;
+    document.documentElement.classList.add("drawer-open");
+    drawer.scrollTop = 0;
+    $("#drawer-title").focus();
+  }
+
+  const fromPulse = (p) => ({ t: p[0] * 1000, n: p[5], u: p[6], s: story.sources[p[7]] || "" });
+
+  /** Opens the stories behind the current selection, exactly as the charts counted them. */
+  function openSelection(options = {}) {
+    let items = slice();
+    if (options.outsideOnly) items = items.filter((p) => p[3] === 0);
+    const scope = scopeLabel() || "Tất cả tin";
+    openDrawer(scope, rangeLabel(), items.map(fromPulse), options.note);
+  }
+
   // ── Chart scaffolding ─────────────────────────────────────────────────────
   // Marks start from their previous size so filtering morphs instead of flashing.
   const previous = new Map();
@@ -159,7 +222,7 @@
     const plot = setChart(
       "flow",
       counts.get(peak) ? `${scope ? `${scope}: c` : "C"}ao điểm ${dayLabel(peak)} với ${fmt(counts.get(peak))} mục` : "Chưa có mục nào khớp bộ lọc",
-      hasBackfill ? `Các ngày trước ${dayLabel(startDay)} chưa đủ dữ liệu nên có thể thấp hơn thực tế.` : "Số tin theo ngày đăng, giờ Việt Nam.",
+      `${hasBackfill ? `Các ngày trước ${dayLabel(startDay)} chưa đủ dữ liệu nên có thể thấp hơn thực tế. ` : ""}Bấm vào một cột để xem danh sách tin.`,
     );
     const inRangeFrom = dayOf(now - state.range * DAY);
 
@@ -214,7 +277,7 @@
         ? `${top.label} áp đảo: gấp ${(top.count / second.count).toFixed(1).replace(".", ",")} lần ${second.label}`
         : `${top.label} được nhắc nhiều nhất: ${fmt(top.count)} tiêu đề`;
     }
-    const plot = setChart("orgs", finding, `Số tiêu đề nhắc tới công ty trong ${rangeLabel()}, không tính bài do chính công ty đó đăng.`);
+    const plot = setChart("orgs", finding, `Số tiêu đề nhắc tới công ty trong ${rangeLabel()}, không tính bài do chính công ty đó đăng. Bấm vào một công ty để xem danh sách.`);
     const max = Math.max(1, ...counts.map((o) => o.count));
     const list = el("div", "hbars");
     for (const o of counts) {
@@ -260,7 +323,7 @@
     const plot = setChart(
       "heat",
       top?.total ? `${top.label} có mặt trong ${share}% số mục của ${rangeLabel()}` : "Chưa có chủ đề nào trong khoảng này",
-      "Ô càng đậm càng nhiều mục. Một mục có thể thuộc nhiều chủ đề, nên tổng phần trăm có thể vượt 100%. Các cột mờ là những ngày chưa đủ dữ liệu.",
+      "Ô càng đậm càng nhiều tin. Một tin có thể thuộc nhiều chủ đề. Các cột mờ là những ngày chưa đủ dữ liệu. Bấm vào một ô hoặc tên chủ đề để xem danh sách.",
     );
     const wrap = el("div", "heat");
     wrap.append(el("span", "heat-corner", "Chủ đề"));
@@ -602,7 +665,7 @@
     const plot = setChart(
       "sectors",
       bank?.count ? `Ngân hàng & tài chính có ${fmt(bank.count)} tin ứng dụng AI, chiếm ${Math.round((bank.count / total) * 100)}% tin theo ngành` : "Chưa có tin ứng dụng AI theo ngành trong khoảng này",
-      `Số tin trong ${rangeLabel()}. Ngân hàng được theo dõi sát hơn các ngành khác, nên so sánh giữa các ngành chỉ mang tính tham khảo.`,
+      `Số tin trong ${rangeLabel()}. Ngân hàng được theo dõi sát hơn các ngành khác, nên so sánh giữa các ngành chỉ mang tính tham khảo. Bấm vào một ngành để xem danh sách.`,
     );
     const max = Math.max(1, ...counts.map((s) => s.count));
     const list = el("div", "hbars hbars-wide");
@@ -626,9 +689,22 @@
   }
 
   // ── 08 Banking: what banks use AI for, and which banks are named ──────────
+  function bankingScope() {
+    return story.banking.rows.filter(([t]) => (state.day !== null ? dayOf(t * 1000) === state.day : t * 1000 >= now - state.range * DAY));
+  }
+
+  function openBanking(theme, bank) {
+    const { themes, banks } = story.banking;
+    const ti = theme ? themes.findIndex((t) => t.key === theme) : -1;
+    const bi = bank ? banks.indexOf(bank) : -1;
+    const rows = bankingScope().filter((r) => (ti < 0 || r[1].includes(ti)) && (bi < 0 || r[2].includes(bi)));
+    const label = ti >= 0 ? `Ngân hàng · ${themes[ti].label}` : `Ngân hàng · ${bank}`;
+    openDrawer(label, rangeLabel(), rows.map((r) => ({ t: r[0] * 1000, n: r[3], u: r[4], s: story.sources[r[5]] || "" })));
+  }
+
   function renderBanking() {
-    const { themes, banks, rows } = story.banking;
-    const scoped = rows.filter(([t]) => (state.day !== null ? dayOf(t * 1000) === state.day : t * 1000 >= now - state.range * DAY));
+    const { themes, banks } = story.banking;
+    const scoped = bankingScope();
     const themeCounts = themes.map((t, i) => ({ ...t, count: scoped.filter((r) => r[1].includes(i)).length }))
       .filter((t) => t.count > 0).sort((a, b) => b.count - a.count);
     const bankCounts = banks.map((label, i) => ({ label, count: scoped.filter((r) => r[2].includes(i)).length }))
@@ -637,7 +713,7 @@
     const plot = setChart(
       "banking",
       topTheme ? `${topTheme.label} là hướng ứng dụng được nhắc nhiều nhất, với ${fmt(topTheme.count)}/${fmt(scoped.length)} tin` : `${fmt(scoped.length)} tin về AI trong ngân hàng, chưa rõ hướng nổi bật`,
-      `Trong ${rangeLabel()}. Một tin có thể thuộc nhiều hướng ứng dụng.`,
+      `Trong ${rangeLabel()}. Một tin có thể thuộc nhiều hướng ứng dụng. Bấm vào một hướng hoặc một ngân hàng để xem danh sách.`,
     );
     const split = el("div", "bank-split");
     const left = el("div");
@@ -645,7 +721,9 @@
     const max = Math.max(1, ...themeCounts.map((t) => t.count));
     const list = el("div", "hbars hbars-wide");
     themeCounts.forEach((t, i) => {
-      const row = el("div", "hbar");
+      const row = el("button", "hbar");
+      row.type = "button";
+      row.dataset.bankTheme = t.key;
       const fill = el("span", `hbar-fill${i === 0 ? " is-peak" : ""}`);
       const track = el("span", "hbar-track");
       track.append(fill);
@@ -660,7 +738,11 @@
       const names = el("ul", "bank-names");
       for (const b of bankCounts.slice(0, 8)) {
         const li = el("li");
-        li.append(el("span", "", b.label), el("span", "bank-count", fmt(b.count)));
+        const button = el("button", "bank-name");
+        button.type = "button";
+        button.dataset.bank = b.label;
+        button.append(el("span", "", b.label), el("span", "bank-count", fmt(b.count)));
+        li.append(button);
         names.append(li);
       }
       right.append(names);
@@ -776,8 +858,12 @@
   document.addEventListener("click", (event) => {
     const target = event.target.closest("button");
     if (!target) return;
-    const { range, topic, org, sector, day, tab, laneIndex, tlView, tlZoom } = target.dataset;
+    const { range, topic, org, sector, day, tab, laneIndex, tlView, tlZoom, bankTheme, bank } = target.dataset;
     if (target.classList.contains("chip")) return; // Chips handle themselves.
+    if (target.id === "drawer-close") { closeDrawer(); return; }
+    if (target.id === "kpi-items-button") { openSelection(); return; }
+    if (bankTheme || bank) { openBanking(bankTheme, bank); return; }
+    const fromTimeline = !!target.closest(".tl-panel");
     if (tlView) {
       timeline.view = tlView;
       renderTimeline();
@@ -831,15 +917,19 @@
       return;
     }
     render();
+    // A selection opens its stories; clearing it closes them.
+    const selected = (topic && state.topic) || (org && state.org) || (sector && state.sector) || (day && state.day !== null);
+    if (!selected) closeDrawer();
+    else openSelection({
+      outsideOnly: !!org && !fromTimeline,
+      note: fromTimeline ? "Danh sách gồm tin trong 14 ngày gần nhất" : "",
+    });
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !drawer.hidden) closeDrawer();
   });
 
   // The HTML is cached at the edge, so recompute ages against this viewer's clock.
-  function relative(t) {
-    const min = Math.max(0, Math.round((now - t) / 60000));
-    if (min < 60) return `${Math.max(1, min)} phút`;
-    const h = Math.round(min / 60);
-    return h < 24 ? `${h} giờ` : `${Math.round(h / 24)} ngày`;
-  }
   for (const node of $$("time[data-t]")) node.textContent = relative(Number(node.dataset.t));
 
   // The scatter is drawn in real pixels, so it needs a redraw when its width changes.

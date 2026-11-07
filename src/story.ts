@@ -54,8 +54,17 @@ function headline(
 
 export function buildStory(rows: Row[], items: DbItem[], entities: { name: string; sources: number }[], dataStart: number, now: number): Story {
   // Trending entries have no publication date, so they stay out of the timeline and get their own chart.
-  const dated = rows.filter((r) => !r.live);
-  const pulse: Story["pulse"] = dated.map((r) => [Math.round(r.t / 1000), indexes(r.topics, TOPIC_INDEX), indexes(r.orgs, ORG_INDEX), r.lane === "labs" ? 1 : 0, indexes(r.sectors, SECTOR_INDEX)]);
+  const dated = rows.filter((r) => !r.live && /^https?:\/\//i.test(r.url));
+  const sources: string[] = [];
+  const sourceIndex = (name: string) => {
+    const i = sources.indexOf(name);
+    return i >= 0 ? i : sources.push(name) - 1;
+  };
+  const title = (r: Row) => r.title.slice(0, 160);
+  const pulse: Story["pulse"] = dated.map((r) => [
+    Math.round(r.t / 1000), indexes(r.topics, TOPIC_INDEX), indexes(r.orgs, ORG_INDEX), r.lane === "labs" ? 1 : 0,
+    indexes(r.sectors, SECTOR_INDEX), title(r), r.url, sourceIndex(r.sourceName),
+  ]);
 
   const week = dated.filter((r) => now - r.t <= 7 * DAY);
   const topicCounts = TOPICS.map((t) => ({ label: t.label, count: week.filter((r) => r.topics.includes(t.key)).length })).sort((a, b) => b.count - a.count);
@@ -89,8 +98,10 @@ export function buildStory(rows: Row[], items: DbItem[], entities: { name: strin
         Math.round(r.t / 1000),
         BANK_THEMES.flatMap((t, i) => (t.re.test(r.title) ? [i] : [])),
         BANKS.flatMap((b, i) => (b.re.test(r.title) ? [i] : [])),
+        title(r), r.url, sourceIndex(r.sourceName),
       ]),
     },
+    sources,
     pulse,
     momentum: {
       today: bars(items, ["gh-trend-all", "gh-trend-py", "gh-trend-ts"], now, true),

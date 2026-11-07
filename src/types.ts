@@ -88,13 +88,18 @@ export interface Story {
   topics: { key: string; label: string }[];
   orgs: { key: string; label: string }[];
   sectors: { key: string; label: string }[];
-  /** One entry per dated story: [epoch seconds, topic indexes, org indexes, 1 if from a lab's own channel, sector indexes]. */
-  pulse: [number, number[], number[], 0 | 1, number[]][];
+  /** Publisher names, referenced by index from pulse and banking rows. */
+  sources: string[];
+  /**
+   * One entry per dated story: [epoch seconds, topic indexes, org indexes, 1 if from a lab's own channel,
+   * sector indexes, title, url, publisher index]. Titles and links let every count open its list.
+   */
+  pulse: [number, number[], number[], 0 | 1, number[], string, string, number][];
   banking: {
     themes: { key: string; label: string }[];
     banks: string[];
-    /** One entry per banking story: [epoch seconds, theme indexes, bank indexes]. */
-    rows: [number, number[], number[]][];
+    /** One entry per banking story: [epoch seconds, theme indexes, bank indexes, title, url, publisher index]. */
+    rows: [number, number[], number[], string, string, number][];
   };
   momentum: { today: MomentumBar[]; week: MomentumBar[]; fresh: MomentumBar[]; hf: MomentumBar[] };
   debate: DebatePoint[];

@@ -69,6 +69,11 @@ it("builds the headline from data and keeps live items out of the timeline", () 
   expect(s.story?.headline.map((h) => h.text).join("")).toContain("3 trang tin");
   expect(s.story?.pulse).toHaveLength(3);
   expect(s.story?.momentum.today[0]).toMatchObject({ n: "acme/llm", v: 900 });
+  // Every counted story can be listed: title, link and publisher travel with it.
+  const first = s.story!.pulse[0]!;
+  expect(first[5]).toBe("GPT-6 is out");
+  expect(first[6]).toBe("https://a.com");
+  expect(s.story!.sources[first[7]]).toBe("Hacker News");
 });
 
 it("reads points and comments for the debate chart", () => {
@@ -107,8 +112,13 @@ it("gathers banking stories from every channel", () => {
 
 it("keeps stories with no industry out of the other-industries list", () => {
   const s = build([item({ id: "a", url_key: "1", source: "pymnts", title: "Tech giants ration AI" })]);
-  const list = renderPage(s, NOW).split("Ứng dụng ở các ngành khác")[1]!;
+  const list = renderPage(s, NOW).split("Ứng dụng ở các ngành khác")[1]!.split("</section>")[0]!;
   expect(list).not.toContain("Tech giants ration AI");
+});
+
+it("keeps unsafe links out of the lists behind the charts", () => {
+  const s = build([item({ url: "javascript:alert(1)", title: "Bad" }), item({ id: "b", url_key: "2", title: "Good" })]);
+  expect(s.story!.pulse.map((p) => p[5])).toEqual(["Good"]);
 });
 
 it("escapes feed content and neutralises unsafe URLs", () => {
