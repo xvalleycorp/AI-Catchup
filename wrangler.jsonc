@@ -1,0 +1,14 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "ai-catchup",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": { "directory": "./public" },
+  "routes": [{ "pattern": "catchup.dxa.io.vn", "custom_domain": true }],
+  // 07:00 and 19:00 Vietnam time.
+  "triggers": { "crons": ["0 0,12 * * *"] },
+  "workflows": [{ "name": "ai-catchup-run", "binding": "CATCHUP_RUN", "class_name": "CatchupRun" }],
+  "d1_databases": [{ "binding": "DB", "database_name": "ai-catchup", "database_id": "c825208c-2133-492a-ac16-d8167659bcd8", "migrations_dir": "migrations" }],
+  "observability": { "enabled": true, "head_sampling_rate": 1 }
+}

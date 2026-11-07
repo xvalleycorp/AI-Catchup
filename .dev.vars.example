@@ -1,0 +1,2 @@
+# Optional: raises the GitHub Search API rate limit. No scopes required.
+GITHUB_TOKEN=

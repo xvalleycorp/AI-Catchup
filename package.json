@@ -1,0 +1,22 @@
+{
+  "name": "ai-catchup",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Rule-based AI news radar on a single page, running on Cloudflare Workers.",
+  "scripts": {
+    "dev": "wrangler dev --test-scheduled",
+    "types": "wrangler types",
+    "check": "wrangler types && tsc --noEmit",
+    "test": "vitest run",
+    "db:local": "wrangler d1 migrations apply ai-catchup --local",
+    "db:remote": "wrangler d1 migrations apply ai-catchup --remote",
+    "deploy": "npm run db:remote && wrangler deploy"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0",
+    "wrangler": "^4.158.0"
+  }
+}
