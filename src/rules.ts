@@ -43,6 +43,26 @@ export function topicsOf(text: string): string[] {
   return TOPICS.filter((t) => t.re.test(text)).map((t) => t.key);
 }
 
+/** Who a headline is about. Matched on titles only: summaries mention rivals in passing. */
+export const ORGS: { key: string; label: string; re: RegExp }[] = [
+  { key: "openai", label: "OpenAI", re: /\bOpenAI\b|ChatGPT|\bGPT[- ]?\d|\bCodex\b|\bSora\b/i },
+  { key: "anthropic", label: "Anthropic", re: /\bAnthropic\b|\bClaude\b/i },
+  { key: "google", label: "Google", re: /\bGoogle\b|DeepMind|\bGemini\b|\bGemma\b|\bVeo\b/i },
+  { key: "meta", label: "Meta", re: /\bMeta\b|\bLlama\b|\bMuse (Spark|Image|Video)\b/ },
+  { key: "microsoft", label: "Microsoft", re: /\bMicrosoft\b|\bCopilot\b/i },
+  { key: "nvidia", label: "NVIDIA", re: /\bNVIDIA\b|\bNemotron\b|\bJensen\b/i },
+  { key: "xai", label: "xAI", re: /\bxAI\b|\bGrok\b/ },
+  { key: "mistral", label: "Mistral", re: /\bMistral\b|\bLe Chonk\b/i },
+  { key: "deepseek", label: "DeepSeek", re: /\bDeepSeek\b/i },
+  { key: "qwen", label: "Qwen", re: /\bQwen\b|\bAlibaba\b/i },
+  { key: "moonshot", label: "Moonshot", re: /\bMoonshot\w*\b|\bKimi\b/i },
+  { key: "hf", label: "Hugging Face", re: /Hugging ?Face/i },
+];
+
+export function orgsOf(title: string): string[] {
+  return ORGS.filter((o) => o.re.test(title)).map((o) => o.key);
+}
+
 // ── 3. Importance ────────────────────────────────────────────────────────────
 const RELEASE = /\b(introduc\w*|announc\w*|launch\w*|releas\w*|unveil\w*|now available|general availability|open[- ]sourc\w*|open[- ]weights?|new model|to acquire|acquires?)\b/i;
 const VERSIONED_MODEL = /\b(GPT|Claude(?: (?:Opus|Sonnet|Haiku|Fable))?|Gemini(?: [A-Z][a-z]+)?|Gemma|Llama|Qwen|DeepSeek(?:[- ][VR])?|Mistral(?: \w+)?|Kimi(?:[- ]K)?|Grok|Sora|Veo|GLM|MiniMax(?:[- ]M)?|Muse(?: \w+)?|Nemotron|Phi)[- ]?(\d+(?:\.\d+)*)\b/gi;
@@ -53,12 +73,12 @@ const MAJOR_MODEL_PROVIDER = /^(OpenAI|Anthropic|Google|Meta|Mistral|DeepSeek|Qw
 
 /** Signal level at which an item becomes "must-see" on its own. */
 export const MUST_THRESHOLD: Partial<Record<Source["kind"], { min: number; label: (n: number) => string }>> = {
-  hn: { min: 300, label: (n) => `HN ${n} điểm` },
-  lobsters: { min: 40, label: (n) => `Lobsters ${n} điểm` },
+  hn: { min: 300, label: (n) => `${n} điểm trên Hacker News` },
+  lobsters: { min: 40, label: (n) => `${n} điểm trên Lobsters` },
   "gh-trending": { min: 800, label: (n) => `+${n.toLocaleString("en-US")} sao` },
-  "gh-search": { min: 3000, label: (n) => `Repo mới ${n.toLocaleString("en-US")} sao` },
-  "hf-models": { min: 300, label: (n) => `HF trending ${n}` },
-  "hf-papers": { min: 50, label: (n) => `Paper ${n} upvote` },
+  "gh-search": { min: 3000, label: (n) => `Dự án mới ${n.toLocaleString("en-US")} sao` },
+  "hf-models": { min: 300, label: () => "Model đang hot" },
+  "hf-papers": { min: 50, label: (n) => `${n} lượt bình chọn` },
 };
 
 const TIER_BASE: Record<Source["tier"], number> = { 1: 50, 2: 28, 3: 18 };
@@ -103,8 +123,8 @@ export function classify(item: RawItem, source: Source): Classified {
   const threshold = MUST_THRESHOLD[source.kind];
   const minSignal = threshold ? threshold.min * (source.id === "gh-trend-week" ? WEEKLY_THRESHOLD_FACTOR : 1) : 0;
   if (threshold && signal >= minSignal) reasons.push(`${threshold.label(signal)}${source.id === "gh-trend-week" ? " trong tuần" : ""}`);
-  if (source.lane === "labs" && source.tier === 1 && !noisy && (release || hasModel)) reasons.push(`Công bố từ ${source.name}`);
-  if (source.kind === "openrouter" && MAJOR_MODEL_PROVIDER.test(item.title)) reasons.push("Model mới từ lab lớn");
+  if (source.lane === "labs" && source.tier === 1 && !noisy && (release || hasModel)) reasons.push(`${source.name} công bố`);
+  if (source.kind === "openrouter" && MAJOR_MODEL_PROVIDER.test(item.title)) reasons.push("Model mới");
 
   return { keep: true, topics: topicsOf(text), baseScore: Math.round(score * 10) / 10, reasons };
 }

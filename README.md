@@ -12,7 +12,7 @@ Toàn cảnh AI trên một trang: tin từ các lab, repo đang lên, model m�
 | Xu hướng | Số mục theo chủ đề trong 7 ngày, các model được nhiều nguồn nhắc đến. Bấm chủ đề để lọc cả trang |
 | 6 cột theo kênh | Lab, GitHub, Model, Paper, Cộng đồng, Báo chí và phân tích |
 | Bản phát hành công cụ | Bản ổn định mới nhất của Claude Code, Codex CLI, Ollama, llama.cpp… |
-| Chân trang | Tình trạng từng nguồn, để biết khi nào có nguồn bị lỗi |
+| Dòng thời gian | Xu hướng theo chủ đề và công ty, tích lũy từ ngày đầu thu thập |
 
 Trình duyệt nhớ lần ghé trước và chấm đỏ các mục mới kể từ đó.
 
@@ -94,6 +94,11 @@ npx wrangler secret put GITHUB_TOKEN
 
 Thêm một dòng vào [`src/sources.ts`](src/sources.ts). Nguồn có RSS hoặc Atom không cần viết thêm code. Nguồn khác cần thêm một parser trong [`src/parsers.ts`](src/parsers.ts).
 
+## Lịch sử
+
+Dữ liệu không bị xóa. `items` giữ mọi tin, `signal_history` ghi giá trị sao, điểm và trending theo từng ngày. Bảng này không thể dựng lại về sau, nên nó bắt đầu ghi ngay từ khi triển khai.
+
 ## API
 
-`GET /api/snapshot.json` trả về toàn bộ dữ liệu của trang.
+- `GET /api/snapshot.json`: dữ liệu của trang, gồm cả tình trạng từng nguồn (`health`) để theo dõi vận hành. Trang không hiển thị và không link tới phần này.
+- `GET /api/history.json`: số liệu theo ngày cho dòng thời gian.

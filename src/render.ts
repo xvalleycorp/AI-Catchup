@@ -1,14 +1,17 @@
 import type { Row, Snapshot } from "./types";
 
-const ASSET_VERSION = "1";
+const ASSET_VERSION = "3";
 
-const LANE_TITLES: { key: keyof Snapshot["lanes"]; title: string; hint: string }[] = [
-  { key: "labs", title: "Từ các lab", hint: "Kênh chính thức" },
-  { key: "github", title: "GitHub", hint: "Repo AI đang lên" },
-  { key: "models", title: "Model", hint: "Hugging Face, OpenRouter" },
-  { key: "papers", title: "Paper", hint: "HF Daily Papers" },
-  { key: "community", title: "Cộng đồng", hint: "HN, Reddit, Lobsters" },
-  { key: "news", title: "Báo chí & phân tích", hint: "Tin và góc nhìn" },
+/** Next run of the 08:00 / 16:00 Vietnam schedule in wrangler.jsonc. */
+const SCAN_HOURS_VN = [8, 16];
+
+const LANE_TITLES: { key: keyof Snapshot["lanes"]; title: string }[] = [
+  { key: "labs", title: "Từ các công ty AI" },
+  { key: "github", title: "Dự án mã nguồn mở" },
+  { key: "models", title: "Model" },
+  { key: "papers", title: "Nghiên cứu" },
+  { key: "community", title: "Cộng đồng" },
+  { key: "news", title: "Báo chí & phân tích" },
 ];
 
 export function esc(s: string): string {
@@ -42,7 +45,7 @@ function rowMeta(r: Row, now: number): string {
 }
 
 function rowAttrs(r: Row): string {
-  return `data-t="${r.t}" data-seen="${r.firstSeen}" data-topics="${esc(r.topics.join(" "))}"`;
+  return `data-t="${r.t}" data-seen="${r.firstSeen}" data-topics="${esc(r.topics.join(" "))}" data-orgs="${esc((r.orgs ?? []).join(" "))}"`;
 }
 
 function laneRow(r: Row, now: number): string {
@@ -53,43 +56,53 @@ function laneRow(r: Row, now: number): string {
 function mustRow(r: Row, now: number): string {
   const summary = r.summary ? `<p class="must-summary">${esc(r.summary)}</p>` : "";
   const reasons = r.reasons.slice(0, 3).map((x) => `<span class="reason">${esc(x)}</span>`).join("");
-  return `<li class="row must-row" ${rowAttrs(r)}><div class="reasons">${reasons}</div><div class="row-title"><span class="dot" aria-hidden="true"></span>${externalLink(r.url, esc(r.title))}</div>${summary}<div class="row-meta">${rowMeta(r, now)}</div></li>`;
+  return `<li class="row must-row" ${rowAttrs(r)}><span class="rank" aria-hidden="true"></span><div class="must-body"><div class="reasons">${reasons}</div><div class="row-title"><span class="dot" aria-hidden="true"></span>${externalLink(r.url, esc(r.title))}</div>${summary}<div class="row-meta">${rowMeta(r, now)}</div></div></li>`;
 }
 
-function lane(title: string, hint: string, rows: Row[], now: number): string {
-  const body = rows.length ? rows.map((r) => laneRow(r, now)).join("") : "";
-  return `<section class="lane" data-lane><header class="lane-head"><h2>${esc(title)}</h2><span>${esc(hint)}</span></header><ol class="rows">${body}</ol><p class="empty"${rows.length ? " hidden" : ""}>Không có mục nào khớp bộ lọc.</p><button type="button" class="more" hidden></button></section>`;
+function lane(title: string, rows: Row[], now: number): string {
+  return `<section class="card lane" data-lane><header class="lane-head"><h3>${esc(title)}</h3></header><ol class="rows">${rows.map((r) => laneRow(r, now)).join("")}</ol><p class="empty"${rows.length ? " hidden" : ""}>Không có mục nào khớp bộ lọc.</p><button type="button" class="more" hidden></button></section>`;
 }
 
-function delta(count: number, prev: number, ready: boolean): string {
-  if (!ready) return "";
-  const d = count - prev;
-  if (d === 0) return `<span class="delta">=</span>`;
-  return `<span class="delta ${d > 0 ? "up" : "down"}">${d > 0 ? "+" : "−"}${Math.abs(d)}</span>`;
+function chart(id: string, eyebrow: string, title: string, cls = ""): string {
+  return `<section class="card chart ${cls}" id="${id}">
+    <p class="eyebrow">${esc(eyebrow)}</p>
+    <h3 class="finding" data-finding>${esc(title)}</h3>
+    <div class="plot" data-plot></div>
+    <p class="caption" data-caption></p>
+    <details class="table-view"><summary>Xem bảng số liệu</summary><div data-table></div></details>
+  </section>`;
 }
 
-function trends(s: Snapshot): string {
-  const topics = s.topics.map((t) => `<li><button type="button" class="topic" data-topic="${esc(t.key)}" aria-pressed="false"><span>${esc(t.label)}</span><span class="topic-num"><b>${t.count}</b>${delta(t.count, t.prev, s.deltaReady)}</span></button></li>`).join("");
+function charts(s: Snapshot): string {
+  if (!s.story) return "";
+  const data = JSON.stringify(s.story).replace(/</g, "\\u003c");
   const entities = s.entities.length
-    ? `<h3>Model đang được nhắc</h3><ul class="entities">${s.entities.map((e) => `<li>${externalLink(e.url, esc(e.name))}<span>${e.sources} nguồn</span></li>`).join("")}</ul>`
+    ? `<section class="card chart" id="entities"><p class="eyebrow">Tên đang nổi</p><h3 class="finding">Model được nhắc đến nhiều nơi cùng lúc</h3><ul class="entities">${s.entities.map((e) => `<li>${externalLink(e.url, esc(e.name))}<span>${e.sources} trang tin</span></li>`).join("")}</ul><p class="caption">Số trang tin khác nhau cùng nhắc tới một model trong 72 giờ qua.</p></section>`
     : "";
-  const note = s.deltaReady ? "Số mục 7 ngày, so với 7 ngày trước." : "Số mục 7 ngày. So sánh tuần sẽ hiện khi đủ 14 ngày dữ liệu.";
-  return `<aside class="trends"><header class="lane-head"><h2>Xu hướng</h2></header><ul class="topics">${topics}</ul><p class="note">${note} Bấm chủ đề để lọc.</p>${entities}</aside>`;
+  return `<script type="application/json" id="story-data">${data}</script>
+  <div class="section-head"><p class="eyebrow">Câu chuyện dữ liệu</p><h2>Điều gì đang diễn ra</h2><p>Bấm vào một ngày, chủ đề hay công ty để lọc cả trang.</p></div>
+  <noscript><p class="caption">Bật JavaScript để xem biểu đồ. Danh sách tin bên dưới vẫn đọc được bình thường.</p></noscript>
+  <div class="bento">
+    ${chart("flow", "01 · Nhịp tin", "Nhịp tin 14 ngày", "span-7")}
+    ${chart("orgs", "02 · Ai được nhắc", "Công ty được nhắc nhiều nhất", "span-5")}
+    ${chart("heat", "03 · Chủ đề", "Chủ đề theo từng ngày", "span-12")}
+    ${chart("timeline", "04 · Dòng thời gian", "Xu hướng theo thời gian", "span-12")}
+    ${chart("momentum", "05 · Đà tăng", "Dự án và model đang tăng nhanh", "span-5")}
+    ${chart("debate", "06 · Tranh luận", "Điều gì khiến cộng đồng tranh luận", "span-7")}
+    ${entities ? entities.replace('class="card chart"', 'class="card chart span-12"') : ""}
+  </div>`;
 }
 
 function tools(s: Snapshot, now: number): string {
   if (!s.lanes.tools.length) return "";
   const cells = s.lanes.tools.map((r) => `<li class="tool" data-seen="${r.firstSeen}">${externalLink(r.url, esc(r.title))}<time data-t="${r.t}">${timeAgo(r.t, now)}</time></li>`).join("");
-  return `<section class="tools"><header class="lane-head"><h2>Bản phát hành công cụ</h2><span>Bản ổn định mới nhất</span></header><ul>${cells}</ul></section>`;
+  return `<section class="tools card"><header class="lane-head"><h3>Phiên bản mới của công cụ AI</h3></header><ul>${cells}</ul></section>`;
 }
 
-function health(s: Snapshot, now: number): string {
-  const bad = s.health.filter((h) => !h.ok);
-  const list = s.health.map((h) => `<li class="${h.ok ? "ok" : "bad"}" title="${esc(h.err ?? `${h.count} mục`)}"><span>${esc(h.name)}</span><span>${h.lastOk ? `${timeAgo(h.lastOk, now)} trước` : "chưa chạy"}</span></li>`).join("");
-  const summary = bad.length
-    ? `<strong>${bad.length}/${s.health.length} nguồn đang lỗi:</strong> ${esc(bad.map((b) => b.name).join(", "))}`
-    : `${s.health.length} nguồn đều hoạt động`;
-  return `<details class="health"><summary>${summary}</summary><ul>${list}</ul></details>`;
+export function nextScanLabel(now: number): string {
+  const vnHour = new Date(now + 7 * 3_600_000).getUTCHours();
+  const next = SCAN_HOURS_VN.find((h) => h > vnHour);
+  return next === undefined ? `${SCAN_HOURS_VN[0]}:00 sáng mai` : `${next}:00`;
 }
 
 function shell(body: string): string {
@@ -99,11 +112,12 @@ function shell(body: string): string {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AI Catchup</title>
-<meta name="description" content="Toàn cảnh tin tức, model, repo và paper AI mới nhất trên một trang.">
+<meta name="description" content="Toàn cảnh AI bằng dữ liệu: tin, model, repo và paper mới nhất trên một trang.">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap">
 <link rel="stylesheet" href="/app.css?v=${ASSET_VERSION}">
+<script src="/theme.js?v=${ASSET_VERSION}"></script>
 <script src="/app.js?v=${ASSET_VERSION}" defer></script>
 </head>
 <body>${body}</body>
@@ -111,42 +125,57 @@ function shell(body: string): string {
 }
 
 export function renderPage(s: Snapshot, now: number): string {
-  const lanes = LANE_TITLES.map((l) => lane(l.title, l.hint, s.lanes[l.key], now)).join("");
-  const updated = new Date(s.generatedAt).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit", year: "numeric" });
-  const must = s.must.length
-    ? s.must.map((r) => mustRow(r, now)).join("")
-    : "";
+  const lanes = LANE_TITLES.map((l) => lane(l.title, s.lanes[l.key], now)).join("");
+  const updated = new Date(s.generatedAt).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" });
+  const headline = s.story
+    ? s.story.headline.map((h) => (h.em ? `<em>${esc(h.text)}</em>` : esc(h.text))).join("")
+    : "Toàn cảnh AI, cập nhật hai lần mỗi ngày.";
   return shell(`
-<header class="top">
-  <div class="brand"><h1>AI Catchup</h1><p>Cập nhật lúc ${esc(updated)}, quét 2 lần mỗi ngày</p></div>
-  <div class="controls">
-    <p class="unread" id="unread" hidden><b id="unread-count"></b> mục mới từ lần trước <button type="button" id="mark-read">Đã xem hết</button></p>
-    <div class="range" role="group" aria-label="Khoảng thời gian">
-      <button type="button" data-range="1" aria-pressed="false">24 giờ</button>
-      <button type="button" data-range="3" aria-pressed="true">3 ngày</button>
-      <button type="button" data-range="7" aria-pressed="false">7 ngày</button>
-      <button type="button" data-range="14" aria-pressed="false">14 ngày</button>
-    </div>
+<header class="bar">
+  <a class="logo" href="/"><span class="logo-mark" aria-hidden="true"></span>AI Catchup</a>
+  <div class="range" role="group" aria-label="Khoảng thời gian">
+    <button type="button" data-range="1" aria-pressed="false">24 giờ</button>
+    <button type="button" data-range="3" aria-pressed="false">3 ngày</button>
+    <button type="button" data-range="7" aria-pressed="true">7 ngày</button>
+    <button type="button" data-range="14" aria-pressed="false">14 ngày</button>
+  </div>
+  <div class="active" id="active-filters" aria-live="polite"></div>
+  <div class="bar-end">
+    <p class="unread" id="unread" hidden><b id="unread-count"></b> mục mới <button type="button" id="mark-read">Đã xem hết</button></p>
+    <button type="button" class="theme" id="theme-toggle" aria-label="Đổi giao diện sáng tối">◐</button>
   </div>
 </header>
 <main>
-  <div class="lead">
-    <section class="must" data-lane data-all>
-      <header class="lane-head"><h2>Không nên bỏ lỡ</h2><span>Lý do chọn ghi ngay trên mỗi mục</span></header>
-      <ol class="rows">${must}</ol>
-      <p class="empty"${s.must.length ? " hidden" : ""}>Chưa có mục nào đạt ngưỡng quan trọng trong khoảng này.</p>
-    </section>
-    ${trends(s)}
-  </div>
+  <section class="hero">
+    <div class="hero-copy">
+      <p class="eyebrow">Cập nhật ${esc(updated)} · Lần tiếp theo lúc ${esc(nextScanLabel(now))}</p>
+      <h1>${headline}</h1>
+      ${s.story?.deck ? `<p class="deck">${esc(s.story.deck)}</p>` : ""}
+    </div>
+    <div class="kpis">
+      <div class="kpi kpi-hero"><span class="kpi-label">Tin mới trong <span data-kpi-range></span></span><span class="kpi-value" id="kpi-items">–</span><span class="kpi-note">Tin tức, bài viết và nghiên cứu</span></div>
+      <div class="kpi"><span class="kpi-label">Không nên bỏ lỡ</span><span class="kpi-value" id="kpi-must">${s.must.length}</span></div>
+      <div class="kpi"><span class="kpi-label">Dự án tăng nhanh nhất</span><span class="kpi-value" id="kpi-repo">${s.story?.momentum.today[0] ? `+${s.story.momentum.today[0].v.toLocaleString("en-US")}` : "–"}</span><span class="kpi-note">${esc(s.story?.momentum.today[0]?.n ?? "")}</span></div>
+      <div class="kpi"><span class="kpi-label">Chủ đề lớn nhất</span><span class="kpi-value kpi-text">${esc(s.topics[0]?.label ?? "–")}</span></div>
+    </div>
+  </section>
+
+  <section class="must" data-lane data-all>
+    <div class="section-head"><p class="eyebrow">Đọc trước</p><h2>Không nên bỏ lỡ</h2><p>Những diễn biến đáng chú ý nhất lúc này.</p></div>
+    <ol class="rows">${s.must.map((r) => mustRow(r, now)).join("")}</ol>
+    <p class="empty"${s.must.length ? " hidden" : ""}>Không có mục quan trọng nào khớp bộ lọc.</p>
+  </section>
+
+  ${charts(s)}
+
+  <div class="section-head"><p class="eyebrow">Đọc theo kênh</p><h2>Tất cả tin</h2></div>
   <div class="grid">${lanes}</div>
   ${tools(s, now)}
 </main>
-<footer class="foot">
-  ${health(s, now)}
-  <p>Chọn lọc hoàn toàn bằng rule, không dùng AI. <a href="https://github.com/xvalleycorp/AI-Catchup/blob/main/src/rules.ts" target="_blank" rel="noopener noreferrer">Xem rule</a> · <a href="https://github.com/xvalleycorp/AI-Catchup" target="_blank" rel="noopener noreferrer">GitHub</a> · <a href="/api/snapshot.json">JSON</a></p>
-</footer>`);
+<div class="tooltip" id="tooltip" role="status" hidden><strong></strong><span></span><small></small></div>
+<footer class="foot"><p>AI Catchup · Cập nhật mỗi ngày lúc 8:00 và 16:00</p></footer>`);
 }
 
 export function renderEmptyPage(): string {
-  return shell(`<main class="waiting"><h1>AI Catchup</h1><p>Lần quét đầu tiên chưa hoàn tất. Bạn quay lại sau ít phút nhé.</p></main>`);
+  return shell(`<main class="waiting"><h1>AI Catchup</h1><p>Trang đang được cập nhật. Bạn quay lại sau ít phút nhé.</p></main>`);
 }

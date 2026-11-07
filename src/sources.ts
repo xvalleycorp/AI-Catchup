@@ -30,18 +30,18 @@ export const SOURCES: Source[] = [
   rss("msr", "Microsoft Research", "labs", 2, "https://www.microsoft.com/en-us/research/feed/", true),
 
   // GitHub
-  trending("gh-trend-all", "GitHub Trending", "?since=daily"),
-  trending("gh-trend-py", "Trending Python", "/python?since=daily"),
-  trending("gh-trend-ts", "Trending TypeScript", "/typescript?since=daily"),
-  trending("gh-trend-week", "Trending tuần", "?since=weekly"),
-  { id: "gh-new", name: "Repo mới nổi", lane: "github", tier: 2, kind: "gh-search", url: "https://api.github.com/search/repositories", live: true },
+  trending("gh-trend-all", "GitHub", "?since=daily"),
+  trending("gh-trend-py", "GitHub", "/python?since=daily"),
+  trending("gh-trend-ts", "GitHub", "/typescript?since=daily"),
+  trending("gh-trend-week", "GitHub", "?since=weekly"),
+  { id: "gh-new", name: "GitHub", lane: "github", tier: 2, kind: "gh-search", url: "https://api.github.com/search/repositories", live: true },
 
   // Models
-  { id: "hf-models", name: "HF Trending", lane: "models", tier: 2, kind: "hf-models", live: true, url: "https://huggingface.co/api/models?sort=trendingScore&limit=30" },
+  { id: "hf-models", name: "Hugging Face", lane: "models", tier: 2, kind: "hf-models", live: true, url: "https://huggingface.co/api/models?sort=trendingScore&limit=30" },
   { id: "openrouter", name: "OpenRouter", lane: "models", tier: 2, kind: "openrouter", url: "https://openrouter.ai/api/v1/models", maxBytes: 80_000 },
 
   // Papers
-  { id: "hf-papers", name: "HF Daily Papers", lane: "papers", tier: 2, kind: "hf-papers", url: "https://huggingface.co/api/daily_papers?limit=40" },
+  { id: "hf-papers", name: "Hugging Face", lane: "papers", tier: 2, kind: "hf-papers", url: "https://huggingface.co/api/daily_papers?limit=40" },
 
   // Community
   { id: "hn", name: "Hacker News", lane: "community", tier: 2, kind: "hn", aiFilter: true, url: "https://hn.algolia.com/api/v1/search_by_date" },

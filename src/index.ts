@@ -25,8 +25,8 @@ const SECURITY_HEADERS = {
   "Referrer-Policy": "no-referrer",
 };
 
-async function loadSnapshot(env: Env): Promise<string | null> {
-  return env.DB.prepare("SELECT value FROM kv WHERE key = 'snapshot'").first<string>("value");
+async function loadKv(env: Env, key: "snapshot" | "history"): Promise<string | null> {
+  return env.DB.prepare("SELECT value FROM kv WHERE key = ?1").bind(key).first<string>("value");
 }
 
 /** The edge cache holds pages for 10 minutes; browsers must revalidate so a new scan shows up on reload. */
@@ -42,7 +42,7 @@ async function handlePage(request: Request, env: Env, ctx: ExecutionContext, jso
   const cached = await cache.match(cacheKey);
   if (cached) return forViewer(cached, request);
 
-  const stored = await loadSnapshot(env);
+  const stored = await loadKv(env, new URL(request.url).pathname === "/api/history.json" ? "history" : "snapshot");
   if (!stored) {
     if (json) return Response.json({ error: "not_ready" }, { status: 503 });
     return new Response(renderEmptyPage(), { status: 503, headers: { "Content-Type": "text/html; charset=utf-8", "Retry-After": "600", ...SECURITY_HEADERS } });
@@ -63,7 +63,7 @@ export default {
     const { pathname } = new URL(request.url);
     try {
       if (pathname === "/") return await handlePage(request, env, ctx, false);
-      if (pathname === "/api/snapshot.json") return await handlePage(request, env, ctx, true);
+      if (pathname === "/api/snapshot.json" || pathname === "/api/history.json") return await handlePage(request, env, ctx, true);
     } catch (e) {
       console.error(JSON.stringify({ event: "request_failed", path: pathname, error: e instanceof Error ? e.message : String(e) }));
       return new Response("Tạm thời không tải được dữ liệu.", { status: 500, headers: { "Content-Type": "text/plain; charset=utf-8" } });

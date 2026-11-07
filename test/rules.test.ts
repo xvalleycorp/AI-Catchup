@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canonicalUrl, classify, decayed, entitiesIn, isAiRelated, topicsOf } from "../src/rules";
+import { canonicalUrl, classify, decayed, entitiesIn, isAiRelated, orgsOf, topicsOf } from "../src/rules";
 import type { Source } from "../src/types";
 
 const src = (over: Partial<Source>): Source => ({ id: "x", name: "X", lane: "news", tier: 2, kind: "rss", url: "https://x", ...over });
@@ -14,7 +14,7 @@ describe("classify", () => {
 
   it("flags a lab release as must-see and explains why", () => {
     const c = classify({ title: "Introducing GPT-5.5", url: "https://x" }, lab);
-    expect(c.reasons).toEqual(["Công bố từ OpenAI"]);
+    expect(c.reasons).toEqual(["OpenAI công bố"]);
     expect(c.topics).toContain("models");
   });
 
@@ -26,7 +26,7 @@ describe("classify", () => {
   it("promotes on signal only past the threshold", () => {
     const hn = src({ kind: "hn", aiFilter: true, lane: "community" });
     expect(classify({ title: "LLM thing", url: "https://x", signal: 299 }, hn).reasons).toEqual([]);
-    expect(classify({ title: "LLM thing", url: "https://x", signal: 300 }, hn).reasons).toEqual(["HN 300 điểm"]);
+    expect(classify({ title: "LLM thing", url: "https://x", signal: 300 }, hn).reasons).toEqual(["300 điểm trên Hacker News"]);
   });
 
   it("does not promote a customer story or a weekly total at the daily threshold", () => {
@@ -48,7 +48,7 @@ describe("classify", () => {
 
   it("recognises major providers on OpenRouter only", () => {
     const or = src({ kind: "openrouter", lane: "models" });
-    expect(classify({ title: "Anthropic: Claude Opus 5.5", url: "https://x" }, or).reasons).toEqual(["Model mới từ lab lớn"]);
+    expect(classify({ title: "Anthropic: Claude Opus 5.5", url: "https://x" }, or).reasons).toEqual(["Model mới"]);
     expect(classify({ title: "SomeCo: Tiny Model", url: "https://x" }, or).reasons).toEqual([]);
   });
 });
@@ -68,4 +68,9 @@ it("canonicalUrl removes tracking and host variants", () => {
 
 it("decayed halves after one half-life", () => {
   expect(decayed(40, 96 * 3_600_000, "labs")).toBeCloseTo(20);
+});
+
+it("orgsOf attributes products to their maker without matching lookalikes", () => {
+  expect(orgsOf("Claude Code vs ChatGPT")).toEqual(["openai", "anthropic"]);
+  expect(orgsOf("Writing metadata for meta tags")).toEqual([]);
 });

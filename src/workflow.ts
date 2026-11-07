@@ -1,5 +1,6 @@
 import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from "cloudflare:workers";
-import { ingestSource, pruneOldItems, recordFailure } from "./ingest";
+import { rebuildHistory } from "./history";
+import { ingestSource, recordFailure } from "./ingest";
 import { SOURCES } from "./sources";
 import { rebuildSnapshot } from "./snapshot";
 
@@ -24,8 +25,8 @@ export class CatchupRun extends WorkflowEntrypoint<Env> {
       }
     }
 
-    await step.do("prune", () => pruneOldItems(this.env, now));
     await step.do("snapshot", () => rebuildSnapshot(this.env, now));
+    await step.do("history", () => rebuildHistory(this.env, now));
     return { ok: SOURCES.length - failed.length, failed };
   }
 }

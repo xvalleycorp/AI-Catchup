@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { buildSnapshot } from "../src/snapshot";
-import { renderPage, safeUrl } from "../src/render";
+import { nextScanLabel, renderPage, safeUrl } from "../src/render";
 
 const NOW = Date.UTC(2026, 10, 7);
 const item = (over: Record<string, unknown>) => ({
@@ -36,7 +36,7 @@ it("flags a model named by three separate sources", () => {
     item({ id: "c", url_key: "3", source: "decoder", title: "A look at gpt 6" }),
   ]);
   expect(s.entities[0]).toMatchObject({ sources: 3 });
-  expect(s.must[0]?.reasons[0]).toMatch(/3 nguồn cùng nhắc/);
+  expect(s.must[0]?.reasons[0]).toMatch(/3 trang tin cùng nhắc/);
 });
 
 it("gives one model launch a single must-see slot", () => {
@@ -56,6 +56,40 @@ it("caps must-see per lane", () => {
 it("caps a prolific source within its lane", () => {
   const items = Array.from({ length: 9 }, (_, i) => item({ id: `o${i}`, url_key: `k${i}`, title: `Story ${i}`, source: "openai" }));
   expect(build(items).lanes.labs).toHaveLength(6);
+});
+
+it("builds the headline from data and keeps live items out of the timeline", () => {
+  const s = build([
+    item({ id: "a", url_key: "1", source: "hn", title: "GPT-6 is out", topics: '["models"]' }),
+    item({ id: "b", url_key: "2", source: "verge", title: "OpenAI ships GPT-6", topics: '["models"]' }),
+    item({ id: "c", url_key: "3", source: "decoder", title: "A look at gpt 6" }),
+    item({ id: "d", url_key: "4", source: "gh-trend-all", title: "acme/llm", url: "https://github.com/acme/llm", signal: 900 }),
+  ]);
+  expect(s.story?.headline.map((h) => h.text).join("")).toContain("3 trang tin");
+  expect(s.story?.pulse).toHaveLength(3);
+  expect(s.story?.momentum.today[0]).toMatchObject({ n: "acme/llm", v: 900 });
+});
+
+it("reads points and comments for the debate chart", () => {
+  const s = build([item({ metric: "▲ 261 · 521 bình luận", discuss_url: "https://news.ycombinator.com/item?id=1", title: "IPO" })]);
+  expect(s.story?.debate[0]).toMatchObject({ p: 261, c: 521 });
+});
+
+it("does not let feed text close the embedded data block", () => {
+  const s = build([item({ title: "</script><script>alert(1)</script>", metric: "▲ 9 · 9 bình luận", discuss_url: "https://news.ycombinator.com/item?id=1" })]);
+  expect(renderPage(s, NOW)).not.toContain("</script><script>alert");
+});
+
+it("next scan label follows the Vietnam schedule", () => {
+  expect(nextScanLabel(Date.UTC(2026, 10, 7, 0))).toBe("8:00"); // 07:00 VN
+  expect(nextScanLabel(Date.UTC(2026, 10, 7, 5))).toBe("16:00"); // 12:00 VN
+  expect(nextScanLabel(Date.UTC(2026, 10, 7, 12))).toBe("8:00 sáng mai"); // 19:00 VN
+});
+
+it("shows readers nothing about how the page is produced", () => {
+  const s = build([item({ title: "A story", source: "hf-papers" })]);
+  const html = renderPage(s, NOW).replace(/<script type="application\/json".*?<\/script>/s, "");
+  for (const internal of ["github.com/xvalleycorp", "rule", "api/snapshot", "nguồn đều", "quét", "HF "]) expect(html).not.toContain(internal);
 });
 
 it("escapes feed content and neutralises unsafe URLs", () => {

@@ -1,5 +1,6 @@
 import { parseSource } from "./parsers";
-import { canonicalUrl, classify, hashKey } from "./rules";
+import { vnDay } from "./history";
+import { canonicalUrl, classify, hashKey, orgsOf } from "./rules";
 import type { RawItem, Source } from "./types";
 
 const USER_AGENT = "ai-catchup/1.0 (+https://catchup.dxa.io.vn)";
@@ -8,7 +9,6 @@ const FETCH_TIMEOUT_MS = 15_000;
 const MAX_BODY_BYTES = 700_000;
 const MAX_ITEM_AGE_MS = 30 * 86_400_000;
 const FIRST_RUN_BACKDATE_MS = 30 * 86_400_000;
-const RETENTION_MS = 60 * 86_400_000;
 
 async function readBounded(res: Response, maxBytes: number): Promise<string> {
   if (!res.body) return "";
@@ -87,6 +87,7 @@ function toRow(item: RawItem, source: Source, now: number, hasRunBefore: boolean
     metric: item.metric || null,
     discuss_url: item.discussUrl ?? null,
     topics: JSON.stringify(verdict.topics),
+    orgs: JSON.stringify(orgsOf(item.title)),
     base_score: verdict.baseScore,
     reasons: JSON.stringify(verdict.reasons),
   };
@@ -96,14 +97,19 @@ const f = (name: string) => `json_extract(value, '$.${name}')`;
 
 /** One statement per source: json_each keeps us well under D1's per-invocation query limit. */
 const UPSERT_SQL = `
-INSERT INTO items (id, source, url_key, title, url, summary, published_at, first_seen, last_seen, signal, metric, discuss_url, topics, base_score, reasons)
+INSERT INTO items (id, source, url_key, title, url, summary, published_at, first_seen, last_seen, signal, metric, discuss_url, topics, orgs, base_score, reasons)
 SELECT ${f("id")}, ${f("source")}, ${f("url_key")}, ${f("title")}, ${f("url")}, ${f("summary")}, ${f("published_at")}, ${f("now")}, ${f("now")},
-       ${f("signal")}, ${f("metric")}, ${f("discuss_url")}, ${f("topics")}, ${f("base_score")}, ${f("reasons")}
+       ${f("signal")}, ${f("metric")}, ${f("discuss_url")}, ${f("topics")}, ${f("orgs")}, ${f("base_score")}, ${f("reasons")}
 FROM json_each(?1) WHERE true
 ON CONFLICT(id) DO UPDATE SET
-  title = excluded.title, signal = excluded.signal, metric = excluded.metric, topics = excluded.topics,
+  title = excluded.title, signal = excluded.signal, metric = excluded.metric, topics = excluded.topics, orgs = excluded.orgs,
   base_score = excluded.base_score, reasons = excluded.reasons, last_seen = excluded.last_seen
-WHERE ?2 = 1 OR items.signal IS NOT excluded.signal OR items.title IS NOT excluded.title OR items.reasons IS NOT excluded.reasons`;
+WHERE ?2 = 1 OR items.signal IS NOT excluded.signal OR items.title IS NOT excluded.title OR items.reasons IS NOT excluded.reasons OR items.orgs IS NOT excluded.orgs`;
+
+const SIGNAL_SQL = `
+INSERT INTO signal_history (item_id, day, signal)
+SELECT json_extract(value, '$.id'), ?2, json_extract(value, '$.signal') FROM json_each(?1) WHERE json_extract(value, '$.signal') > 0
+ON CONFLICT(item_id, day) DO UPDATE SET signal = excluded.signal`;
 
 /** Fetch, parse, classify and store one source. Throws on failure so the Workflow step can retry. */
 export async function ingestSource(env: Env, source: Source, now: number): Promise<number> {
@@ -111,7 +117,10 @@ export async function ingestSource(env: Env, source: Source, now: number): Promi
   const raw = await fetchSource(source, env, now);
   const rows = raw.flatMap((item) => toRow(item, source, now, (status ?? 0) > 0) ?? []);
   const statements: D1PreparedStatement[] = [];
-  if (rows.length > 0) statements.push(env.DB.prepare(UPSERT_SQL).bind(JSON.stringify(rows), source.live ? 1 : 0));
+  if (rows.length > 0) {
+    const json = JSON.stringify(rows);
+    statements.push(env.DB.prepare(UPSERT_SQL).bind(json, source.live ? 1 : 0), env.DB.prepare(SIGNAL_SQL).bind(json, vnDay(now)));
+  }
   statements.push(env.DB.prepare(
     `INSERT INTO source_status (id, last_run, last_ok, last_err, last_count) VALUES (?1, ?2, ?2, NULL, ?3)
      ON CONFLICT(id) DO UPDATE SET last_run = ?2, last_ok = ?2, last_err = NULL, last_count = ?3`,
@@ -127,8 +136,4 @@ export async function recordFailure(env: Env, source: Source, now: number, error
     `INSERT INTO source_status (id, last_run, last_ok, last_err, last_count) VALUES (?1, ?2, 0, ?3, 0)
      ON CONFLICT(id) DO UPDATE SET last_run = ?2, last_err = ?3`,
   ).bind(source.id, now, error.slice(0, 200)).run();
-}
-
-export async function pruneOldItems(env: Env, now: number): Promise<void> {
-  await env.DB.prepare("DELETE FROM items WHERE last_seen < ?1 AND published_at < ?1").bind(now - RETENTION_MS).run();
 }

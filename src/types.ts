@@ -54,9 +54,40 @@ export interface Row {
   summary: string | null;
   discussUrl: string | null;
   topics: string[];
+  orgs: string[];
   reasons: string[];
   also: string[];
   score: number;
+}
+
+export interface MomentumBar {
+  n: string; // name
+  u: string; // url
+  v: number; // value
+  d: string; // description
+}
+
+export interface DebatePoint {
+  n: string; // title
+  u: string; // discussion url
+  p: number; // points
+  c: number; // comments
+  t: number; // epoch seconds
+  tp: number[]; // topic indexes
+  o: number[]; // org indexes
+}
+
+/** Everything the charts need; filtered in the browser so all charts agree on one slice. */
+export interface Story {
+  dataStart: number;
+  topics: { key: string; label: string }[];
+  orgs: { key: string; label: string }[];
+  /** One entry per dated story: [epoch seconds, topic indexes, org indexes, 1 if from a lab's own channel]. */
+  pulse: [number, number[], number[], 0 | 1][];
+  momentum: { today: MomentumBar[]; week: MomentumBar[]; fresh: MomentumBar[]; hf: MomentumBar[] };
+  debate: DebatePoint[];
+  headline: { text: string; em?: boolean }[];
+  deck: string;
 }
 
 export interface Snapshot {
@@ -68,4 +99,5 @@ export interface Snapshot {
   /** True once the database covers 14+ days, so week-over-week deltas are meaningful. */
   deltaReady: boolean;
   health: { id: string; name: string; ok: boolean; lastOk: number; err: string | null; count: number }[];
+  story?: Story;
 }

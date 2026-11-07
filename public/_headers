@@ -1,3 +1,6 @@
 /app.*
   Cache-Control: public, max-age=86400
   X-Content-Type-Options: nosniff
+/theme.js
+  Cache-Control: public, max-age=86400
+  X-Content-Type-Options: nosniff
