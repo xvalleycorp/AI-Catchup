@@ -32,7 +32,7 @@ Trình duyệt nhớ lần ghé trước và chấm đỏ các mục mới kể 
 ## Cách hoạt động
 
 ```
-Cron 07:00 và 19:00 (giờ Việt Nam)
+Cron 08:00 và 16:00 (giờ Việt Nam)
   └─ Workflow CatchupRun
        ├─ mỗi nguồn một step: tải → phân tích → áp rule → ghi D1
        └─ step cuối: dựng snapshot của trang
