@@ -140,6 +140,7 @@
   let pendingReturnKey = null;
 
   function openDrawer(title, sub, entries, note) {
+    $("#drawer-mark-read").hidden = true;
     drawerReturn = document.activeElement;
     const ds = drawerReturn?.dataset || {};
     drawerReturnKey = RETURN_KEYS.filter((k) => ds[k] !== undefined)
@@ -851,6 +852,20 @@
   store.set(KEYS.visit, now);
   store.set(KEYS.baseline, baseline);
 
+  /** The new stories themselves, read from the page so the list matches the bubble. */
+  function openUnread() {
+    const entries = new Map();
+    for (const node of $$("[data-seen]")) {
+      if (Number(node.dataset.seen) <= baseline) continue;
+      const link = $("a", node);
+      if (!link || entries.has(link.href)) continue;
+      entries.set(link.href, { t: Number(node.dataset.t || node.dataset.seen), n: link.textContent.trim(), u: link.href, s: $(".src", node)?.textContent || "" });
+    }
+    openDrawer("Mục mới", "Từ lần ghé trước", [...entries.values()]);
+    // The drawer covers the bar's tick, so the list carries its own.
+    $("#drawer-mark-read").hidden = entries.size === 0;
+  }
+
   function paintUnread() {
     const seen = new Set();
     for (const node of $$("[data-seen]")) {
@@ -873,6 +888,7 @@
     if (target.id === "skin-toggle") { setSkin(skin() === "terminal" ? "pro" : "terminal"); return; }
     if (target.dataset.centerTab) { showCenter(target.dataset.centerTab); return; }
     if (target.id === "kpi-items-button") { openSelection(); return; }
+    if (target.id === "unread-open") { openUnread(); return; }
     if (bankTheme || bank) { openBanking(bankTheme, bank); return; }
     const fromTimeline = !!target.closest(".tl-panel");
     pendingReturnKey = returnKeyFor(target);
@@ -912,10 +928,11 @@
       else state.expanded.add(index);
       renderLists();
       return;
-    } else if (target.id === "mark-read") {
+    } else if (target.id === "mark-read" || target.id === "drawer-mark-read") {
       baseline = Date.now();
       store.set(KEYS.baseline, baseline);
       paintUnread();
+      closeDrawer();
       return;
     } else if (target.id === "theme-toggle") {
       const dark = document.documentElement.dataset.theme

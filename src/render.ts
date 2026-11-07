@@ -1,6 +1,6 @@
 import type { Row, Snapshot } from "./types";
 
-const ASSET_VERSION = "7";
+const ASSET_VERSION = "8";
 
 /** Next run of the 08:00 / 16:00 Vietnam schedule in wrangler.jsonc. */
 const SCAN_HOURS_VN = [8, 16];
@@ -156,7 +156,10 @@ export function renderPage(s: Snapshot, now: number): string {
     </div>
     <div class="active" id="active-filters" aria-live="polite"></div>
     <div class="bar-end">
-      <p class="unread" id="unread" hidden><b id="unread-count"></b> mục mới <button type="button" id="mark-read">Đã xem hết</button></p>
+      <div class="unread" id="unread" hidden>
+        <button type="button" class="unread-bubble" id="unread-open"><span class="unread-count" id="unread-count"></span><span>mục mới</span></button>
+        <button type="button" class="unread-done" id="mark-read" title="Đánh dấu đã xem hết" aria-label="Đánh dấu đã xem hết">✓</button>
+      </div>
       <button type="button" class="skin" id="skin-toggle">Đổi giao diện</button>
       <button type="button" class="theme" id="theme-toggle" aria-label="Đổi giao diện sáng tối">◐</button>
     </div>
@@ -209,7 +212,8 @@ export function renderPage(s: Snapshot, now: number): string {
 </form>
 <aside class="drawer" id="drawer" aria-labelledby="drawer-title" hidden>
   <header class="drawer-head">
-    <div><p class="eyebrow">Chi tiết</p><h2 id="drawer-title" tabindex="-1"></h2><p class="drawer-sub" id="drawer-sub"></p></div>
+    <div><p class="eyebrow">Chi tiết</p><h2 id="drawer-title" tabindex="-1"></h2><p class="drawer-sub" id="drawer-sub"></p>
+      <button type="button" class="drawer-action" id="drawer-mark-read" hidden>✓ Đã xem hết</button></div>
     <button type="button" class="drawer-close" id="drawer-close" aria-label="Đóng danh sách">×</button>
   </header>
   <ol class="drawer-list" id="drawer-list"></ol>
