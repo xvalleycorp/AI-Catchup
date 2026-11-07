@@ -532,7 +532,13 @@ html:not(.js) .lane .row:nth-child(n+7) { display: none; }
 :root:not([data-skin="terminal"]) .pane-risk { order: 1; }
 :root:not([data-skin="terminal"]) .pane-overview { order: 2; }
 :root:not([data-skin="terminal"]) .pane-all { order: 3; }
-.life { min-width: 680px; }
-.life-model { min-width: 200px; overflow-wrap: break-word; word-break: normal; }
-.life td:nth-child(2) { white-space: nowrap; }
+/* Three columns that always fit the card: no sideways scrolling, long ids wrap. */
+.life-wrap { overflow-x: hidden; }
+.life { table-layout: fixed; }
+.life th:nth-child(1) { width: 8.5em; }
+.life th:nth-child(3) { width: 34%; }
+.life-date .life-status { display: table; margin-top: 4px; }
+.life-model, .life-repl { overflow-wrap: anywhere; }
+.life-repl { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12.5px; }
+.life-provider { display: block; margin-top: 2px; font-family: var(--sans); font-size: 12px; color: var(--ink-3); }
 .caption.warn { color: var(--accent-ink); font-weight: 600; }

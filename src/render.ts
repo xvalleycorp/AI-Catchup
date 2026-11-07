@@ -1,6 +1,6 @@
 import type { Row, Snapshot } from "./types";
 
-const ASSET_VERSION = "9";
+const ASSET_VERSION = "10";
 
 /** Next run of the 08:00 / 16:00 Vietnam schedule in wrangler.jsonc. */
 const SCAN_HOURS_VN = [8, 16];
@@ -148,7 +148,7 @@ function risk(s: Snapshot, now: number): string {
     : "Chưa có lịch ngừng hỗ trợ nào sắp tới";
   const lifeRows = life.map((l) => {
     const st = lifecycleStatus(l.retiresAt, now);
-    return `<tr class="${st.cls}"><td class="life-date">${vnDate(l.retiresAt)}</td><td>${esc(l.provider)}</td><td class="life-model">${externalLink(l.url, esc(l.model))}</td><td>${esc(l.replacement || "–")}</td><td><span class="life-status">${st.text}</span></td></tr>`;
+    return `<tr class="${st.cls}"><td class="life-date">${vnDate(l.retiresAt)}<span class="life-status">${st.text}</span></td><td class="life-model">${externalLink(l.url, esc(l.model))}<span class="life-provider">${esc(l.provider)}</span></td><td class="life-repl">${esc(l.replacement || "–")}</td></tr>`;
   }).join("");
   return `<div class="section-head"><p class="eyebrow">Rủi ro nền tảng</p><h2>Bảo mật &amp; vòng đời nền tảng AI</h2></div>
   <div class="bento">
@@ -164,7 +164,7 @@ function risk(s: Snapshot, now: number): string {
     <section class="card span-12">
       <p class="eyebrow">Vòng đời model · Lịch ngừng hỗ trợ</p>
       <h3 class="finding">${esc(lifeFinding)}</h3>
-      ${life.length ? `<div class="life-wrap"><table class="life"><thead><tr><th>Ngày ngừng</th><th>Nhà cung cấp</th><th>Model</th><th>Thay thế bằng</th><th>Trạng thái</th></tr></thead><tbody>${lifeRows}</tbody></table></div>` : ""}
+      ${life.length ? `<div class="life-wrap"><table class="life"><thead><tr><th>Ngày ngừng</th><th>Model · Nhà cung cấp</th><th>Thay thế bằng</th></tr></thead><tbody>${lifeRows}</tbody></table></div>` : ""}
       <p class="caption">Chỉ gồm ngày ngừng đã được nhà cung cấp công bố chắc chắn, không gồm ngày dự kiến. OpenAI, Anthropic, Google Gemini.</p>
     </section>
   </div>`;
