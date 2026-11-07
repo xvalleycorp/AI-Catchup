@@ -121,6 +121,11 @@ it("keeps unsafe links out of the lists behind the charts", () => {
   expect(s.story!.pulse.map((p) => p[5])).toEqual(["Good"]);
 });
 
+it("offers both looks over one set of panes", () => {
+  const html = renderPage(build([item({})]), NOW);
+  for (const id of ['id="pane-1"', 'id="pane-2"', 'id="pane-3"', 'id="skin-toggle"', 'id="cmd-form"', 'data-center-tab="all"']) expect(html).toContain(id);
+});
+
 it("escapes feed content and neutralises unsafe URLs", () => {
   const s = build([item({ title: `<img src=x onerror="alert(1)">`, url: "javascript:alert(1)", reasons: '["<b>"]' })]);
   const html = renderPage(s, NOW);

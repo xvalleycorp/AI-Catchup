@@ -1,6 +1,6 @@
 import type { Row, Snapshot } from "./types";
 
-const ASSET_VERSION = "6";
+const ASSET_VERSION = "7";
 
 /** Next run of the 08:00 / 16:00 Vietnam schedule in wrangler.jsonc. */
 const SCAN_HOURS_VN = [8, 16];
@@ -128,7 +128,7 @@ function shell(body: string): string {
 <meta name="description" content="Toàn cảnh AI bằng dữ liệu: tin, model, repo và paper mới nhất trên một trang.">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600;800&family=VT323&display=swap">
 <link rel="stylesheet" href="/app.css?v=${ASSET_VERSION}">
 <script src="/theme.js?v=${ASSET_VERSION}"></script>
 <script src="/app.js?v=${ASSET_VERSION}" defer></script>
@@ -157,6 +157,7 @@ export function renderPage(s: Snapshot, now: number): string {
     <div class="active" id="active-filters" aria-live="polite"></div>
     <div class="bar-end">
       <p class="unread" id="unread" hidden><b id="unread-count"></b> mục mới <button type="button" id="mark-read">Đã xem hết</button></p>
+      <button type="button" class="skin" id="skin-toggle">Đổi giao diện</button>
       <button type="button" class="theme" id="theme-toggle" aria-label="Đổi giao diện sáng tối">◐</button>
     </div>
   </div></header>
@@ -174,22 +175,38 @@ export function renderPage(s: Snapshot, now: number): string {
     </div>
   </section>
 </div>
-<main>
-
-  <section class="must" data-lane data-all>
+<main class="panes" id="panes" data-center="overview">
+  <section class="pane pane-must must" id="pane-1" tabindex="-1" aria-label="Không nên bỏ lỡ" data-lane data-all>
+    <header class="pane-head"><span>[1] KHÔNG NÊN BỎ LỠ</span></header>
     <div class="section-head"><h2>Không nên bỏ lỡ</h2></div>
     <ol class="rows">${s.must.map((r) => mustRow(r, now)).join("")}</ol>
     <p class="empty"${s.must.length ? " hidden" : ""}>Không có mục quan trọng nào khớp bộ lọc.</p>
   </section>
 
-  ${sectors(s, now)}
+  <section class="pane pane-center" id="pane-2" tabindex="-1" aria-label="Tổng quan và tất cả tin">
+    <header class="pane-head" role="tablist" aria-label="Nội dung khung giữa">
+      <button type="button" class="pane-tab" role="tab" data-center-tab="overview" aria-selected="true">[2] TỔNG QUAN</button>
+      <button type="button" class="pane-tab" role="tab" data-center-tab="all" aria-selected="false">[4] TẤT CẢ TIN</button>
+    </header>
+    <div class="pane-overview">${charts(s)}</div>
+    <div class="pane-all">
+      <div class="section-head"><h2>Tất cả tin</h2></div>
+      <div class="grid">${lanes}</div>
+      ${tools(s, now)}
+    </div>
+  </section>
 
-  ${charts(s)}
-
-  <div class="section-head"><h2>Tất cả tin</h2></div>
-  <div class="grid">${lanes}</div>
-  ${tools(s, now)}
+  <section class="pane pane-feature" id="pane-3" tabindex="-1" aria-label="Ngân hàng và các ngành">
+    <header class="pane-head"><span>[3] NGÂN HÀNG &amp; CÁC NGÀNH</span></header>
+    ${sectors(s, now)}
+  </section>
 </main>
+<form class="cmd" id="cmd-form" role="search">
+  <label for="cmd-input">catchup:~$</label>
+  <input id="cmd-input" name="cmd" autocomplete="off" spellcheck="false" placeholder="gõ lệnh, ví dụ: tìm openai · ngành ngân hàng · khoảng 3 · help">
+  <output id="cmd-out" for="cmd-input" aria-live="polite"></output>
+  <span class="cmd-keys">1–4 chọn khung · / gõ lệnh · Esc đóng</span>
+</form>
 <aside class="drawer" id="drawer" aria-labelledby="drawer-title" hidden>
   <header class="drawer-head">
     <div><p class="eyebrow">Chi tiết</p><h2 id="drawer-title" tabindex="-1"></h2><p class="drawer-sub" id="drawer-sub"></p></div>

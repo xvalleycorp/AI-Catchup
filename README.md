@@ -17,6 +17,13 @@ Toàn cảnh AI trên một trang: tin từ các lab, repo đang lên, model m�
 
 Trình duyệt nhớ lần ghé trước và chấm đỏ các mục mới kể từ đó.
 
+Có hai giao diện, chuyển bằng nút trên thanh đầu trang (trình duyệt ghi nhớ lựa chọn):
+
+- **Terminal** (mặc định): toàn màn hình, không cuộn trang, gồm các khung [1] Không nên bỏ lỡ, [2] Tổng quan, [3] Ngân hàng & các ngành, [4] Tất cả tin. Phím 1–4 chọn khung, `/` mở dòng lệnh: `tìm <từ khóa>`, `ngành <tên>`, `chủ đề <tên>`, `công ty <tên>`, `khoảng 1|3|7|14`, `xóa`, `giao diện pro|terminal`, `help`.
+- **Professional**: trang cuộn, phong cách báo cáo phân tích, có chế độ sáng và tối.
+
+Bấm vào bất kỳ cột, thanh hoặc ô nào trên biểu đồ để mở danh sách tin tạo nên con số đó.
+
 ## Nguồn dữ liệu
 
 52 nguồn, khai báo trong [`src/sources.ts`](src/sources.ts):

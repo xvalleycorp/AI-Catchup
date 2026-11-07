@@ -5,7 +5,7 @@
   const LANE_LIMIT = window.innerWidth < 720 ? 5 : 6;
   const TIMELINE_DAYS = 14;
   const SESSION_GAP = 30 * 60000;
-  const KEYS = { range: "catchup.range", visit: "catchup.lastVisit", baseline: "catchup.baseline", theme: "catchup.theme" };
+  const KEYS = { range: "catchup.range", visit: "catchup.lastVisit", baseline: "catchup.baseline", theme: "catchup.theme", skin: "catchup.skin" };
 
   // Browser storage can throw or come back empty; everything below works without it.
   const store = {
@@ -123,20 +123,29 @@
     drawer.hidden = true;
     document.documentElement.classList.remove("drawer-open");
     // Charts redraw on selection, so the clicked mark may be a fresh node with the same data.
-    let back = drawerReturn;
-    if (back && !document.contains(back) && drawerReturnKey) back = document.querySelector(drawerReturnKey);
+    let back = drawerReturnKey ? document.querySelector(drawerReturnKey) : null;
+    if (!back && drawerReturn && document.contains(drawerReturn) && drawerReturn !== document.body) back = drawerReturn;
     if (back) back.focus();
     drawerReturn = null;
     drawerReturnKey = null;
   }
 
   /** entries: [{ t (ms), n (title), u (url), s (publisher) }] */
+  function returnKeyFor(node) {
+    const ds = node?.dataset || {};
+    const key = RETURN_KEYS.filter((k) => ds[k] !== undefined)
+      .map((k) => '[data-' + k.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase()) + '="' + CSS.escape(ds[k]) + '"]').join('');
+    return key ? '.' + node.className.split(' ')[0] + key : null;
+  }
+  let pendingReturnKey = null;
+
   function openDrawer(title, sub, entries, note) {
     drawerReturn = document.activeElement;
     const ds = drawerReturn?.dataset || {};
     drawerReturnKey = RETURN_KEYS.filter((k) => ds[k] !== undefined)
       .map((k) => '[data-' + k.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase()) + '="' + CSS.escape(ds[k]) + '"]').join('') || null;
     if (drawerReturnKey) drawerReturnKey = '.' + drawerReturn.className.split(' ')[0] + drawerReturnKey;
+    if (pendingReturnKey) { drawerReturnKey = pendingReturnKey; pendingReturnKey = null; }
     $("#drawer-title").textContent = title;
     $("#drawer-sub").textContent = `${sub} · ${fmt(entries.length)} tin${note ? `. ${note}` : ""}`;
     const list = $("#drawer-list");
@@ -861,9 +870,12 @@
     const { range, topic, org, sector, day, tab, laneIndex, tlView, tlZoom, bankTheme, bank } = target.dataset;
     if (target.classList.contains("chip")) return; // Chips handle themselves.
     if (target.id === "drawer-close") { closeDrawer(); return; }
+    if (target.id === "skin-toggle") { setSkin(skin() === "terminal" ? "pro" : "terminal"); return; }
+    if (target.dataset.centerTab) { showCenter(target.dataset.centerTab); return; }
     if (target.id === "kpi-items-button") { openSelection(); return; }
     if (bankTheme || bank) { openBanking(bankTheme, bank); return; }
     const fromTimeline = !!target.closest(".tl-panel");
+    pendingReturnKey = returnKeyFor(target);
     if (tlView) {
       timeline.view = tlView;
       renderTimeline();
@@ -926,7 +938,105 @@
     });
   });
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && !drawer.hidden) closeDrawer();
+    if (event.key === "Escape" && !drawer.hidden) { closeDrawer(); return; }
+    const typing = event.target.closest?.("input, textarea, select, [contenteditable]");
+    if (typing || event.metaKey || event.ctrlKey || event.altKey || skin() !== "terminal") return;
+    if (event.key === "/") { event.preventDefault(); $("#cmd-input").focus(); return; }
+    if (["1", "2", "3", "4"].includes(event.key)) { event.preventDefault(); focusPane(event.key); }
+  });
+
+  // ── Skins and panes ───────────────────────────────────────────────────────
+  const skin = () => (document.documentElement.dataset.skin === "pro" ? "pro" : "terminal");
+  function paintSkinToggle() {
+    $("#skin-toggle").textContent = skin() === "terminal" ? "Giao diện: Terminal" : "Giao diện: Professional";
+  }
+  function setSkin(next) {
+    document.documentElement.dataset.skin = next;
+    store.set(KEYS.skin, next);
+    paintSkinToggle();
+    render();
+  }
+  function showCenter(which) {
+    $("#panes").dataset.center = which;
+    for (const tab of $$("[data-center-tab]")) tab.setAttribute("aria-selected", String(tab.dataset.centerTab === which));
+  }
+  function focusPane(key) {
+    if (key === "2") showCenter("overview");
+    if (key === "4") showCenter("all");
+    const pane = document.getElementById(key === "4" ? "pane-2" : `pane-${key}`);
+    pane.focus({ preventScroll: skin() === "terminal" });
+    if (skin() !== "terminal") pane.scrollIntoView({ behavior: "smooth" });
+  }
+
+  // ── Command line: plain-word commands over the same filters as the charts ─
+  const fold = (text) => text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D").toLowerCase().trim();
+  const findIn = (list, query) => {
+    const q = fold(query);
+    return list.find((x) => fold(x.label) === q) || list.find((x) => fold(x.label).startsWith(q)) || list.find((x) => fold(x.label).includes(q));
+  };
+  const HELP = "Lệnh: tìm <từ khóa> · ngành <tên> · chủ đề <tên> · công ty <tên> · khoảng 1|3|7|14 · xóa · giao diện pro|terminal";
+
+  function runCommand(raw) {
+    const input = raw.trim().replace(/^\//, "tìm ");
+    const words = fold(input);
+    const say = (text) => { $("#cmd-out").textContent = text; };
+    if (!words || words === "help" || words === "?" || words === "tro giup") return say(HELP);
+    const arg = (prefixes) => {
+      // Split on words, not characters: folding accents changes the string length.
+      for (const p of prefixes) {
+        if (words.startsWith(p + " ")) return input.split(/\s+/).slice(p.split(" ").length).join(" ");
+      }
+      return null;
+    };
+    let value;
+    if ((value = arg(["tim", "search", "find"])) !== null) {
+      const q = fold(value);
+      const hits = story ? story.pulse.filter((p) => fold(p[5]).includes(q)).map(fromPulse) : [];
+      openDrawer(`Tìm: ${value}`, "14 ngày qua", hits);
+      return say(`${fmt(hits.length)} tin khớp “${value}”`);
+    }
+    if ((value = arg(["khoang", "range"])) !== null) {
+      const days = Number.parseInt(value, 10);
+      if (![1, 3, 7, 14].includes(days)) return say("Khoảng hợp lệ: 1, 3, 7, 14 ngày");
+      state.range = days;
+      state.day = null;
+      store.set(KEYS.range, days);
+      render();
+      return say(`Khoảng: ${rangeLabel()}`);
+    }
+    const dims = [
+      [["nganh", "sector"], () => story.sectors, "sector"],
+      [["chu de", "topic"], () => story.topics, "topic"],
+      [["cong ty", "org", "company"], () => story.orgs, "org"],
+    ];
+    for (const [prefixes, list, key] of dims) {
+      if ((value = arg(prefixes)) === null) continue;
+      const hit = story && findIn(list(), value);
+      if (!hit) return say(`Không tìm thấy “${value}”`);
+      state[key] = hit.key;
+      render();
+      openSelection({ outsideOnly: key === "org" });
+      return say(`Lọc: ${hit.label}`);
+    }
+    if (words === "xoa" || words === "clear" || words === "reset") {
+      Object.assign(state, { topic: null, org: null, sector: null, day: null });
+      render();
+      closeDrawer();
+      return say("Đã xóa bộ lọc");
+    }
+    if ((value = arg(["giao dien", "theme", "skin"])) !== null) {
+      const next = fold(value).startsWith("p") ? "pro" : "terminal";
+      setSkin(next);
+      return say(`Giao diện: ${next === "pro" ? "Professional" : "Terminal"}`);
+    }
+    return say("Không hiểu lệnh. Gõ help để xem danh sách lệnh.");
+  }
+
+  $("#cmd-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const input = $("#cmd-input");
+    runCommand(input.value);
+    input.select();
   });
 
   // The HTML is cached at the edge, so recompute ages against this viewer's clock.
@@ -959,6 +1069,7 @@
       .catch(() => { document.getElementById("timeline").hidden = true; });
   }
 
+  paintSkinToggle();
   paintUnread();
   render();
 })();
