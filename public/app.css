@@ -542,3 +542,4 @@ html:not(.js) .lane .row:nth-child(n+7) { display: none; }
 .life-repl { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12.5px; }
 .life-provider { display: block; margin-top: 2px; font-family: var(--sans); font-size: 12px; color: var(--ink-3); }
 .caption.warn { color: var(--accent-ink); font-weight: 600; }
+.drawer-cmd { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 14px; color: var(--accent-ink); }

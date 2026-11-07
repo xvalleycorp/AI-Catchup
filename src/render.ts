@@ -1,6 +1,6 @@
 import type { Row, Snapshot } from "./types";
 
-const ASSET_VERSION = "10";
+const ASSET_VERSION = "11";
 
 /** Next run of the 08:00 / 16:00 Vietnam schedule in wrangler.jsonc. */
 const SCAN_HOURS_VN = [8, 16];
@@ -59,8 +59,8 @@ function mustRow(r: Row, now: number): string {
   return `<li class="row must-row" ${rowAttrs(r)}><span class="rank" aria-hidden="true"></span><div class="must-body"><div class="reasons">${reasons}</div><div class="row-title"><span class="dot" aria-hidden="true"></span>${externalLink(r.url, esc(r.title))}</div>${summary}<div class="row-meta">${rowMeta(r, now)}</div></div></li>`;
 }
 
-function lane(title: string, rows: Row[], now: number, cls = ""): string {
-  return `<section class="card lane ${cls}" data-lane><header class="lane-head"><h3>${esc(title)}</h3></header><ol class="rows">${rows.map((r) => laneRow(r, now)).join("")}</ol><p class="empty"${rows.length ? " hidden" : ""}>Không có mục nào khớp bộ lọc.</p><button type="button" class="more" hidden></button></section>`;
+function lane(title: string, rows: Row[], now: number, cls = "", key = ""): string {
+  return `<section class="card lane ${cls}" data-lane data-lane-key="${key}"><header class="lane-head"><h3>${esc(title)}</h3></header><ol class="rows">${rows.map((r) => laneRow(r, now)).join("")}</ol><p class="empty"${rows.length ? " hidden" : ""}>Không có mục nào khớp bộ lọc.</p><button type="button" class="more" hidden></button></section>`;
 }
 
 function chart(id: string, eyebrow: string, title: string, cls = ""): string {
@@ -100,8 +100,8 @@ function sectors(s: Snapshot, now: number): string {
   <div class="bento">
     ${chart("sectors", "Chuyên đề · Theo ngành", "Tin về ứng dụng AI theo ngành", "span-5")}
     ${chart("banking", "Chuyên đề · Ngân hàng", "AI trong ngân hàng", "span-7")}
-    ${lane("Tin AI trong ngân hàng & tài chính", s.banking ?? [], now, "span-7")}
-    ${lane("Ứng dụng ở các ngành khác", s.lanes.industry.filter((r) => r.sectors.length > 0 && !r.sectors.includes("banking")), now, "span-5")}
+    ${lane("Tin AI trong ngân hàng & tài chính", s.banking ?? [], now, "span-7", "banking")}
+    ${lane("Ứng dụng ở các ngành khác", s.lanes.industry.filter((r) => r.sectors.length > 0 && !r.sectors.includes("banking")), now, "span-5", "industry")}
   </div>
   </section>`;
 }
@@ -148,11 +148,11 @@ function risk(s: Snapshot, now: number): string {
     : "Chưa có lịch ngừng hỗ trợ nào sắp tới";
   const lifeRows = life.map((l) => {
     const st = lifecycleStatus(l.retiresAt, now);
-    return `<tr class="${st.cls}"><td class="life-date">${vnDate(l.retiresAt)}<span class="life-status">${st.text}</span></td><td class="life-model">${externalLink(l.url, esc(l.model))}<span class="life-provider">${esc(l.provider)}</span></td><td class="life-repl">${esc(l.replacement || "–")}</td></tr>`;
+    return `<tr class="${st.cls}" data-retires="${l.retiresAt}"><td class="life-date">${vnDate(l.retiresAt)}<span class="life-status">${st.text}</span></td><td class="life-model">${externalLink(l.url, esc(l.model))}<span class="life-provider">${esc(l.provider)}</span></td><td class="life-repl">${esc(l.replacement || "–")}</td></tr>`;
   }).join("");
   return `<div class="section-head"><p class="eyebrow">Rủi ro nền tảng</p><h2>Bảo mật &amp; vòng đời nền tảng AI</h2></div>
   <div class="bento">
-    <section class="card span-12 lane sec-lane" data-lane data-unfiltered>
+    <section class="card span-12 lane sec-lane" data-lane data-unfiltered data-lane-key="security">
       <p class="eyebrow">Lỗ hổng bảo mật · Thư viện AI phổ biến</p>
       <h3 class="finding">${esc(advisoryFinding)}</h3>
       <ol class="rows">${advisories.map((r) => advisoryRow(r, now)).join("")}</ol>
@@ -173,7 +173,7 @@ function risk(s: Snapshot, now: number): string {
 function tools(s: Snapshot, now: number): string {
   if (!s.lanes.tools.length) return "";
   const cells = s.lanes.tools.map((r) => `<li class="tool" data-seen="${r.firstSeen}">${externalLink(r.url, esc(r.title))}<time data-t="${r.t}">${timeAgo(r.t, now)}</time></li>`).join("");
-  return `<section class="tools card"><header class="lane-head"><h3>Phiên bản mới của công cụ AI</h3></header><ul>${cells}</ul></section>`;
+  return `<section class="tools card" data-lane-key="tools"><header class="lane-head"><h3>Phiên bản mới của công cụ AI</h3></header><ul>${cells}</ul></section>`;
 }
 
 export function nextScanLabel(now: number): string {
@@ -202,7 +202,7 @@ function shell(body: string): string {
 }
 
 export function renderPage(s: Snapshot, now: number): string {
-  const lanes = LANE_TITLES.map((l) => lane(l.title, s.lanes[l.key], now)).join("");
+  const lanes = LANE_TITLES.map((l) => lane(l.title, s.lanes[l.key], now, "", l.key)).join("");
   const updated = new Date(s.generatedAt).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" });
   const headline = s.story
     ? s.story.headline.map((h) => (h.em ? `<em>${esc(h.text)}</em>` : esc(h.text))).join("")
@@ -243,7 +243,7 @@ export function renderPage(s: Snapshot, now: number): string {
   </section>
 </div>
 <main class="panes" id="panes" data-center="overview">
-  <section class="pane pane-must must" id="pane-1" tabindex="-1" aria-label="Không nên bỏ lỡ" data-lane data-all>
+  <section class="pane pane-must must" id="pane-1" tabindex="-1" aria-label="Không nên bỏ lỡ" data-lane data-all data-lane-key="must">
     <header class="pane-head"><span>[1] KHÔNG NÊN BỎ LỠ</span></header>
     <div class="section-head"><h2>Không nên bỏ lỡ</h2></div>
     <ol class="rows">${s.must.map((r) => mustRow(r, now)).join("")}</ol>
@@ -272,9 +272,9 @@ export function renderPage(s: Snapshot, now: number): string {
 </main>
 <form class="cmd" id="cmd-form" role="search">
   <label for="cmd-input">catchup:~$</label>
-  <input id="cmd-input" name="cmd" autocomplete="off" spellcheck="false" placeholder="gõ lệnh, ví dụ: tìm openai · ngành ngân hàng · khoảng 3 · help">
+  <input id="cmd-input" name="cmd" autocomplete="off" spellcheck="false" placeholder="gõ lệnh, ví dụ: find openai · industry banking · model gpt-4o · help">
   <output id="cmd-out" for="cmd-input" aria-live="polite"></output>
-  <span class="cmd-keys">1–5 chọn khung · / gõ lệnh · Esc đóng</span>
+  <span class="cmd-keys">1–5 chọn khung · / gõ lệnh · help xem lệnh · Esc đóng</span>
 </form>
 <aside class="drawer" id="drawer" aria-labelledby="drawer-title" hidden>
   <header class="drawer-head">

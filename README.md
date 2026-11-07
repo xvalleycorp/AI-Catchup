@@ -20,7 +20,7 @@ Trình duyệt nhớ lần ghé trước và chấm đỏ các mục mới kể 
 
 Có hai giao diện, chuyển bằng nút trên thanh đầu trang (trình duyệt ghi nhớ lựa chọn):
 
-- **Terminal** (mặc định): toàn màn hình, không cuộn trang, gồm các khung [1] Không nên bỏ lỡ, [2] Tổng quan, [3] Ngân hàng & các ngành, [4] Tất cả tin, [5] Bảo mật & vòng đời. Phím 1–5 chọn khung, `/` mở dòng lệnh: `tìm <từ khóa>`, `ngành <tên>`, `chủ đề <tên>`, `công ty <tên>`, `khoảng 1|3|7|14`, `xóa`, `giao diện pro|terminal`, `help`.
+- **Terminal** (mặc định): toàn màn hình, không cuộn trang, gồm các khung [1] Không nên bỏ lỡ, [2] Tổng quan, [3] Ngân hàng & các ngành, [4] Tất cả tin, [5] Bảo mật & vòng đời. Phím 1–5 chọn khung, `/` mở dòng lệnh (tên lệnh tiếng Anh, Tab gợi ý, ↑ ↓ gọi lại): `find <từ khóa>` (toàn trang), `industry`, `topic`, `company`, `source`, `bank` (bỏ trống tham số để xem danh sách), `model <tên>`, `retire [ngày]`, `vuln [mức|thư viện]`, `must`, `new`, `lane <nhóm>`, `day <dd/mm>`, `range 1|3|7|14`, `clear`, `go 1-5`, `theme pro|terminal`, `help`.
 - **Professional**: trang cuộn, phong cách báo cáo phân tích, có chế độ sáng và tối.
 
 Bấm vào bất kỳ cột, thanh hoặc ô nào trên biểu đồ để mở danh sách tin tạo nên con số đó.

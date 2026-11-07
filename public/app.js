@@ -139,7 +139,8 @@
   }
   let pendingReturnKey = null;
 
-  function openDrawer(title, sub, entries, note) {
+  /** options.keepOrder keeps the given order; options.unit names what is counted. Entries may carry m (meta text) and no u (plain row). */
+  function openDrawer(title, sub, entries, note, options = {}) {
     $("#drawer-mark-read").hidden = true;
     drawerReturn = document.activeElement;
     const ds = drawerReturn?.dataset || {};
@@ -148,21 +149,25 @@
     if (drawerReturnKey) drawerReturnKey = '.' + drawerReturn.className.split(' ')[0] + drawerReturnKey;
     if (pendingReturnKey) { drawerReturnKey = pendingReturnKey; pendingReturnKey = null; }
     $("#drawer-title").textContent = title;
-    $("#drawer-sub").textContent = `${sub} · ${fmt(entries.length)} tin${note ? `. ${note}` : ""}`;
+    $("#drawer-sub").textContent = `${sub} · ${fmt(entries.length)} ${options.unit || "tin"}${note ? `. ${note}` : ""}`;
     const list = $("#drawer-list");
     list.replaceChildren();
-    for (const e of [...entries].sort((a, b) => b.t - a.t)) {
+    for (const e of options.keepOrder ? entries : [...entries].sort((a, b) => b.t - a.t)) {
       const li = el("li", "drawer-row");
-      const a = el("a", "drawer-link", e.n);
-      a.href = /^https?:\/\//i.test(e.u) ? e.u : "#";
-      a.target = "_blank";
-      a.rel = "noopener noreferrer";
+      let head;
+      if (e.u) {
+        head = el("a", "drawer-link", e.n);
+        head.href = /^https?:\/\//i.test(e.u) ? e.u : "#";
+        head.target = "_blank";
+        head.rel = "noopener noreferrer";
+      } else head = el("p", "drawer-link drawer-cmd", e.n);
       const meta = el("p", "drawer-meta");
-      meta.append(el("span", "src", e.s), document.createTextNode(` · ${relative(e.t)} trước · ${dayLabel(dayOf(e.t))}`));
-      li.append(a, meta);
+      if (e.m) meta.textContent = e.m;
+      else meta.append(el("span", "src", e.s), document.createTextNode(` · ${relative(e.t)} trước · ${dayLabel(dayOf(e.t))}`));
+      li.append(head, meta);
       list.append(li);
     }
-    if (!entries.length) list.append(el("li", "empty", "Không có tin nào."));
+    if (!entries.length) list.append(el("li", "empty", "Không có kết quả nào."));
     drawer.hidden = false;
     document.documentElement.classList.add("drawer-open");
     drawer.scrollTop = 0;
@@ -987,75 +992,271 @@
     if (skin() !== "terminal") pane.scrollIntoView({ behavior: "smooth" });
   }
 
-  // ── Command line: plain-word commands over the same filters as the charts ─
-  const fold = (text) => text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D").toLowerCase().trim();
+  // ── Command line: English commands over everything the page holds ────────
+  const fold = (text) => String(text).normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D").toLowerCase().trim();
   const findIn = (list, query) => {
     const q = fold(query);
-    return list.find((x) => fold(x.label) === q) || list.find((x) => fold(x.label).startsWith(q)) || list.find((x) => fold(x.label).includes(q));
+    const keys = (x) => [fold(x.label), fold(x.key || "")];
+    return list.find((x) => keys(x).includes(q)) || list.find((x) => keys(x).some((k) => k.startsWith(q))) || list.find((x) => keys(x).some((k) => k.includes(q)));
   };
-  const HELP = "Lệnh: tìm <từ khóa> · ngành <tên> · chủ đề <tên> · công ty <tên> · khoảng 1|3|7|14 · xóa · giao diện pro|terminal";
+  const COMMANDS = [
+    ["find <từ khóa>", "Tìm trong mọi tin, lỗ hổng, model và công cụ trên trang. Nhiều từ thì kết quả phải chứa đủ các từ. Phím tắt: /từ khóa"],
+    ["industry [tên]", "Lọc theo ngành, ví dụ industry banking. Bỏ trống để xem các ngành."],
+    ["topic [tên]", "Lọc theo chủ đề, ví dụ topic agent. Bỏ trống để xem các chủ đề."],
+    ["company [tên]", "Tin nhắc đến một công ty, ví dụ company openai. Bỏ trống để xem các công ty."],
+    ["source [tên]", "Tin từ một nguồn, ví dụ source finextra. Bỏ trống để xem các nguồn."],
+    ["bank [hướng | ngân hàng]", "Tin AI trong ngân hàng, ví dụ bank fraud, bank jpmorgan. Bỏ trống để xem các hướng và ngân hàng."],
+    ["model <tên>", "Lịch ngừng hỗ trợ và tin liên quan của một model, ví dụ model gpt-4o."],
+    ["retire [số ngày]", "Model ngừng hỗ trợ trong N ngày tới, mặc định 90."],
+    ["vuln [mức | thư viện]", "Lỗ hổng bảo mật, ví dụ vuln critical, vuln high, vuln langchain."],
+    ["must", "Danh sách không nên bỏ lỡ."],
+    ["new", "Các mục mới từ lần ghé trước."],
+    ["lane <tên>", "Một nhóm tin: labs, github, models, papers, community, news, tools, banking, industry, security."],
+    ["day <dd/mm | today | yesterday>", "Tin trong một ngày, ví dụ day 05/11."],
+    ["range 1|3|7|14", "Đổi khoảng thời gian của biểu đồ và danh sách."],
+    ["clear", "Xóa mọi bộ lọc."],
+    ["go 1-5", "Chuyển tới khung 1 đến 5."],
+    ["theme pro | terminal", "Đổi giao diện."],
+    ["help", "Danh sách lệnh. Tab để gợi ý tên lệnh, ↑ ↓ để gọi lại lệnh đã gõ."],
+  ];
+  const COMMAND_NAMES = COMMANDS.map(([c]) => c.split(" ")[0]);
+  const SEVERITY = { critical: "NGHIÊM TRỌNG", high: "CAO", medium: "TRUNG BÌNH", low: "THẤP" };
+  const LANE_KEYS = ["must", "labs", "github", "models", "papers", "community", "news", "tools", "banking", "industry", "security"];
 
-  function runCommand(raw) {
-    const input = raw.trim().replace(/^\//, "tìm ");
-    const words = fold(input);
-    const say = (text) => { $("#cmd-out").textContent = text; };
-    if (!words || words === "help" || words === "?" || words === "tro giup") return say(HELP);
-    const arg = (prefixes) => {
-      // Split on words, not characters: folding accents changes the string length.
-      for (const p of prefixes) {
-        if (words.startsWith(p + " ")) return input.split(/\s+/).slice(p.split(" ").length).join(" ");
-      }
-      return null;
-    };
-    let value;
-    if ((value = arg(["tim", "search", "find"])) !== null) {
-      const q = fold(value);
-      const hits = story ? story.pulse.filter((p) => fold(p[5]).includes(q)).map(fromPulse) : [];
-      openDrawer(`Tìm: ${value}`, "14 ngày qua", hits);
-      return say(`${fmt(hits.length)} tin khớp “${value}”`);
-    }
-    if ((value = arg(["khoang", "range"])) !== null) {
-      const days = Number.parseInt(value, 10);
-      if (![1, 3, 7, 14].includes(days)) return say("Khoảng hợp lệ: 1, 3, 7, 14 ngày");
-      state.range = days;
-      state.day = null;
-      store.set(KEYS.range, days);
-      render();
-      return say(`Khoảng: ${rangeLabel()}`);
-    }
-    const dims = [
-      [["nganh", "sector"], () => story.sectors, "sector"],
-      [["chu de", "topic"], () => story.topics, "topic"],
-      [["cong ty", "org", "company"], () => story.orgs, "org"],
-    ];
-    for (const [prefixes, list, key] of dims) {
-      if ((value = arg(prefixes)) === null) continue;
-      const hit = story && findIn(list(), value);
-      if (!hit) return say(`Không tìm thấy “${value}”`);
-      state[key] = hit.key;
-      render();
-      openSelection({ outsideOnly: key === "org" });
-      return say(`Lọc: ${hit.label}`);
-    }
-    if (words === "xoa" || words === "clear" || words === "reset") {
-      Object.assign(state, { topic: null, org: null, sector: null, day: null });
-      render();
-      closeDrawer();
-      return say("Đã xóa bộ lọc");
-    }
-    if ((value = arg(["giao dien", "theme", "skin"])) !== null) {
-      const next = fold(value).startsWith("p") ? "pro" : "terminal";
-      setSkin(next);
-      return say(`Giao diện: ${next === "pro" ? "Professional" : "Terminal"}`);
-    }
-    return say("Không hiểu lệnh. Gõ help để xem danh sách lệnh.");
+  /** A story row on the page as a drawer entry. */
+  function rowEntry(node, fallbackSource = "") {
+    const link = $("a", node);
+    if (!link) return null;
+    const sev = $(".sev", node)?.textContent;
+    const source = $(".src", node)?.textContent.trim() || fallbackSource;
+    const t = Number(node.dataset.t || $("time[data-t]", node)?.dataset.t) || 0;
+    return { t, n: link.textContent.trim(), u: link.href, s: sev ? `${sev} · ${source}` : source };
+  }
+  const laneEntries = (key) => {
+    const section = $(`[data-lane-key="${key}"]`);
+    if (!section) return [];
+    const fallback = key === "tools" ? "Công cụ AI" : "";
+    return $$("li", section).map((li) => rowEntry(li, fallback)).filter(Boolean);
+  };
+  const advisoryEntries = () => laneEntries("security");
+  function lifecycleEntries() {
+    return $$(".life tbody tr").map((tr) => {
+      const link = $(".life-model a", tr);
+      const provider = $(".life-provider", tr)?.textContent || "";
+      const status = $(".life-status", tr)?.textContent || "";
+      const date = $(".life-date", tr)?.firstChild?.textContent || "";
+      const repl = $(".life-repl", tr)?.textContent || "–";
+      return {
+        t: Number(tr.dataset.retires) || 0, n: link?.textContent.trim() || "", u: link?.href || "",
+        m: `${provider} · ngừng ${date} · ${status} · thay bằng ${repl}`, life: true,
+      };
+    }).filter((e) => e.n);
+  }
+  /** Every story, advisory, tool release and model date the page holds, once each. */
+  function everything() {
+    const all = new Map();
+    if (story) for (const p of story.pulse) { const e = fromPulse(p); all.set(e.u, e); }
+    for (const key of LANE_KEYS) for (const e of laneEntries(key)) if (!all.has(e.u)) all.set(e.u, e);
+    for (const e of lifecycleEntries()) all.set(`life:${e.n}`, e);
+    return [...all.values()];
+  }
+  const textOf = (e) => fold(`${e.n} ${e.s || ""} ${e.m || ""}`);
+  const matchAll = (entries, query) => {
+    const words = fold(query).split(/\s+/).filter(Boolean);
+    return entries.filter((e) => { const text = textOf(e); return words.every((w) => text.includes(w)); });
+  };
+  /** A list of choices for a bare command, each with how to call it. */
+  function openChoices(title, command, items) {
+    $("#cmd-out").textContent = `${title}: ${fmt(items.length)}`;
+    openDrawer(title, "Gõ một trong các lệnh dưới đây", items.map((x) => ({ n: x.label, m: `${command} ${x.key || fold(x.label)}${x.count !== undefined ? ` · ${fmt(x.count)} tin trong 14 ngày` : ""}` })), "", { keepOrder: true, unit: "mục" });
+  }
+  const countBy = (index) => {
+    const counts = new Map();
+    for (const p of story.pulse) for (const i of [].concat(p[index])) counts.set(i, (counts.get(i) || 0) + 1);
+    return counts;
+  };
+  function parseDay(value) {
+    const v = fold(value);
+    if (v === "today" || v === "hom nay") return today;
+    if (v === "yesterday" || v === "hom qua") return today - 1;
+    const m = v.match(/^(\d{1,2})[/.-](\d{1,2})(?:[/.-](\d{2,4}))?$/);
+    if (!m) return null;
+    const year = m[3] ? (m[3].length === 2 ? 2000 + Number(m[3]) : Number(m[3])) : new Date(now + VN_OFFSET).getUTCFullYear();
+    let day = Math.floor(Date.UTC(year, Number(m[2]) - 1, Number(m[1])) / DAY);
+    if (!m[3] && day > today) day = Math.floor(Date.UTC(year - 1, Number(m[2]) - 1, Number(m[1])) / DAY);
+    return day;
   }
 
+  /** Filters stack, so always say the whole scope and how to undo it. */
+  function filterSummary() {
+    const scope = scopeLabel();
+    const count = fmt(slice().length);
+    return scope ? `Lọc: ${scope} · ${rangeLabel()} · ${count} tin · clear để bỏ lọc` : `${rangeLabel()} · ${count} tin`;
+  }
+
+  function runCommand(raw) {
+    const input = raw.trim().replace(/^\/\s*/, "find ");
+    const say = (text) => { $("#cmd-out").textContent = text; };
+    const [head = "", ...rest] = input.split(/\s+/);
+    const cmd = fold(head);
+    const value = rest.join(" ");
+    const has = value.trim().length > 0;
+    switch (cmd) {
+      case "": case "help": case "?": case "h": {
+        openDrawer("Lệnh", "Gõ ở dòng catchup:~$", COMMANDS.map(([n, m]) => ({ n, m })), "", { keepOrder: true, unit: "lệnh" });
+        return say("help: danh sách lệnh đã mở");
+      }
+      case "find": case "search": case "grep": {
+        if (!has) return say("Cần từ khóa, ví dụ: find langchain");
+        const hits = matchAll(everything(), value);
+        openDrawer(`find ${value}`, "Toàn bộ trang", hits);
+        return say(`${fmt(hits.length)} kết quả cho “${value}”`);
+      }
+      case "industry": case "sector": case "topic": case "company": case "org": {
+        if (!story) return say("Chưa có dữ liệu");
+        const [list, key, index, label] = cmd === "topic" ? [story.topics, "topic", 1, "chủ đề"]
+          : cmd === "company" || cmd === "org" ? [story.orgs, "org", 2, "công ty"] : [story.sectors, "sector", 4, "ngành"];
+        if (!has) {
+          const counts = countBy(index);
+          return openChoices(`Các ${label}`, cmd, list.map((x, i) => ({ ...x, count: counts.get(i) || 0 })).sort((a, b) => b.count - a.count));
+        }
+        const hit = findIn(list, value);
+        if (!hit) return say(`Không có ${label} “${value}”. Gõ ${cmd} để xem danh sách.`);
+        state[key] = hit.key;
+        render();
+        openSelection({ outsideOnly: key === "org" });
+        return say(filterSummary());
+      }
+      case "source": case "src": {
+        if (!story) return say("Chưa có dữ liệu");
+        const counts = countBy(7);
+        if (!has) return openChoices("Các nguồn tin", "source", story.sources.map((label, i) => ({ label, key: fold(label), count: counts.get(i) || 0 })).filter((x) => x.count).sort((a, b) => b.count - a.count));
+        const q = fold(value);
+        const names = story.sources.filter((s) => fold(s).includes(q));
+        if (!names.length) return say(`Không có nguồn “${value}”. Gõ source để xem danh sách.`);
+        const hits = everything().filter((e) => names.some((n) => fold(e.s || "").includes(fold(n))));
+        openDrawer(`source ${names.length === 1 ? names[0] : value}`, "14 ngày qua", hits);
+        return say(`${fmt(hits.length)} tin từ ${names.join(", ")}`);
+      }
+      case "bank": {
+        if (!story?.banking) return say("Chưa có dữ liệu ngân hàng");
+        const { themes, banks } = story.banking;
+        if (!has) {
+          return openChoices("Ngân hàng: hướng ứng dụng và tên ngân hàng", "bank", [...themes, ...banks.map((b) => ({ label: b, key: fold(b) }))]);
+        }
+        const theme = findIn(themes, value);
+        const bank = theme ? null : banks.find((b) => fold(b).includes(fold(value)));
+        if (!theme && !bank) return say(`Không có hướng hay ngân hàng “${value}”. Gõ bank để xem danh sách.`);
+        openBanking(theme?.key, bank);
+        return say(`Ngân hàng · ${theme ? theme.label : bank} · ${rangeLabel()}`);
+      }
+      case "model": {
+        if (!has) return say("Cần tên model, ví dụ: model gpt-4o. Gõ retire để xem lịch ngừng.");
+        const life = matchAll(lifecycleEntries(), value);
+        const news = matchAll(everything().filter((e) => !e.life), value).sort((a, b) => b.t - a.t);
+        openDrawer(`model ${value}`, "Lịch ngừng hỗ trợ, rồi tin liên quan", [...life, ...news], "", { keepOrder: true, unit: "mục" });
+        return say(`${fmt(life.length)} lịch ngừng hỗ trợ, ${fmt(news.length)} tin`);
+      }
+      case "retire": case "eol": case "deprecations": {
+        const days = has ? Number.parseInt(value, 10) : 90;
+        if (!Number.isFinite(days) || days < 1) return say("Ví dụ: retire 30");
+        const hits = lifecycleEntries().filter((e) => e.t >= now - DAY && e.t <= now + days * DAY).sort((a, b) => a.t - b.t);
+        openDrawer(`retire ${days}`, `Model ngừng hỗ trợ trong ${days} ngày tới`, hits, "", { keepOrder: true, unit: "model" });
+        return say(`${fmt(hits.length)} model ngừng hỗ trợ trong ${days} ngày tới`);
+      }
+      case "vuln": case "cve": case "security": {
+        let hits = advisoryEntries();
+        const level = SEVERITY[fold(value)];
+        if (level) {
+          const order = Object.values(SEVERITY);
+          hits = hits.filter((e) => order.indexOf(e.s.split(" · ")[0]) <= order.indexOf(level));
+        } else if (has) hits = matchAll(hits, value);
+        openDrawer(`vuln ${value}`.trim(), level ? `Mức ${level.toLowerCase()} trở lên · 14 ngày qua` : "14 ngày qua", hits, "", { keepOrder: true });
+        return say(`${fmt(hits.length)} lỗ hổng`);
+      }
+      case "must": {
+        const hits = laneEntries("must");
+        openDrawer("Không nên bỏ lỡ", "Xếp theo mức quan trọng", hits, "", { keepOrder: true });
+        return say(`${fmt(hits.length)} mục không nên bỏ lỡ`);
+      }
+      case "new": case "unread": openUnread(); return say("Các mục mới từ lần ghé trước");
+      case "lane": {
+        const key = LANE_KEYS.find((k) => k.startsWith(fold(value)));
+        if (!has || !key) return say(`lane: ${LANE_KEYS.join(", ")}`);
+        const section = $(`[data-lane-key="${key}"]`);
+        const title = $("h3", section)?.textContent || $(".pane-head, h2", section)?.textContent || key;
+        const hits = laneEntries(key);
+        openDrawer(title, "Toàn bộ nhóm, không theo bộ lọc", hits, "", { keepOrder: key === "must" || key === "security" });
+        return say(`${title}: ${fmt(hits.length)} mục`);
+      }
+      case "day": case "date": {
+        const day = parseDay(value);
+        if (day === null) return say("Ví dụ: day 05/11, day today, day yesterday");
+        if (day > today || today - day >= TIMELINE_DAYS) return say(`Trang giữ ${TIMELINE_DAYS} ngày gần nhất, đến hôm nay`);
+        state.day = day;
+        render();
+        openSelection();
+        return say(filterSummary());
+      }
+      case "range": {
+        const days = Number.parseInt(value, 10);
+        if (![1, 3, 7, 14].includes(days)) return say("range: 1, 3, 7 hoặc 14 ngày");
+        state.range = days;
+        state.day = null;
+        store.set(KEYS.range, days);
+        render();
+        return say(`Khoảng: ${rangeLabel()}`);
+      }
+      case "clear": case "reset": {
+        Object.assign(state, { topic: null, org: null, sector: null, day: null });
+        render();
+        closeDrawer();
+        return say("Đã xóa bộ lọc");
+      }
+      case "go": case "pane": {
+        if (!["1", "2", "3", "4", "5"].includes(value.trim())) return say("go 1 đến 5");
+        closeDrawer();
+        focusPane(value.trim());
+        return say(`Khung ${value.trim()}`);
+      }
+      case "theme": case "skin": {
+        const next = fold(value).startsWith("p") ? "pro" : "terminal";
+        setSkin(next);
+        return say(`Giao diện: ${next === "pro" ? "Professional" : "Terminal"}`);
+      }
+      default:
+        return say(`Không có lệnh “${head}”. Gõ help để xem danh sách.`);
+    }
+  }
+
+  // Shell comforts: ↑ ↓ recall earlier commands, Tab completes a command name.
+  const history = [];
+  let historyAt = 0;
   $("#cmd-form").addEventListener("submit", (event) => {
     event.preventDefault();
     const input = $("#cmd-input");
+    const line = input.value.trim();
+    if (line && history[history.length - 1] !== line) history.push(line);
+    historyAt = history.length;
     runCommand(input.value);
     input.select();
+  });
+  $("#cmd-input").addEventListener("keydown", (event) => {
+    const input = event.currentTarget;
+    if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+      if (!history.length) return;
+      event.preventDefault();
+      historyAt = Math.max(0, Math.min(history.length, historyAt + (event.key === "ArrowUp" ? -1 : 1)));
+      input.value = history[historyAt] ?? "";
+      return;
+    }
+    if (event.key === "Tab" && input.value && !/\s/.test(input.value)) {
+      const options = COMMAND_NAMES.filter((c) => c.startsWith(fold(input.value)));
+      if (!options.length) return;
+      event.preventDefault();
+      if (options.length === 1) input.value = `${options[0]} `;
+      else $("#cmd-out").textContent = options.join(" · ");
+    }
   });
 
   // The HTML is cached at the edge, so recompute ages against this viewer's clock.
