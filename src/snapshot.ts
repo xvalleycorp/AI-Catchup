@@ -109,10 +109,20 @@ export function buildSnapshot(items: DbItem[], statuses: { id: string; last_ok: 
   }
 
   const perLane = new Map<Lane, number>();
+  const mustByEntity = new Map<string, Row>();
   const must = rows
     .filter((r) => r.reasons.length > 0 && now - r.t <= MUST_WINDOW)
     .sort(byScore)
     .filter((r) => {
+      // Differently titled reports of one model launch take a single slot; the top one keeps all the reasons.
+      const entities = entitiesIn(r.title);
+      const kept = entities.map((e) => mustByEntity.get(e.key)).find(Boolean);
+      if (kept) {
+        kept.reasons = [...new Set([...kept.reasons, ...r.reasons])];
+        kept.discussUrl ??= r.discussUrl;
+        return false;
+      }
+      for (const e of entities) mustByEntity.set(e.key, r);
       const n = perLane.get(r.lane) ?? 0;
       perLane.set(r.lane, n + 1);
       return n < MUST_LANE_CAP[r.lane];

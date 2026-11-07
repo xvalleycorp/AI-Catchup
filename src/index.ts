@@ -10,7 +10,7 @@ const CSP = [
   "default-src 'none'",
   // The zone has Cloudflare Web Analytics enabled, which injects this beacon.
   "script-src 'self' https://static.cloudflareinsights.com",
-  "connect-src https://cloudflareinsights.com",
+  "connect-src 'self' https://cloudflareinsights.com",
   "style-src 'self' https://fonts.googleapis.com",
   "font-src https://fonts.gstatic.com",
   "img-src 'self'",

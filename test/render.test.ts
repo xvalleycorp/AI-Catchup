@@ -39,6 +39,15 @@ it("flags a model named by three separate sources", () => {
   expect(s.must[0]?.reasons[0]).toMatch(/3 nguồn cùng nhắc/);
 });
 
+it("gives one model launch a single must-see slot", () => {
+  const s = build([
+    item({ id: "a", url_key: "1", source: "deepmind", title: "Gemini Omni 1.2 Flash: fast clips", base_score: 60, reasons: '["lab"]' }),
+    item({ id: "b", url_key: "2", source: "hn", title: "Gemini Omni 1.2 Flash", reasons: '["HN"]' }),
+  ]);
+  expect(s.must).toHaveLength(1);
+  expect(s.must[0]?.reasons).toEqual(["lab", "HN"]);
+});
+
 it("caps must-see per lane", () => {
   const items = Array.from({ length: 6 }, (_, i) => item({ id: `h${i}`, url_key: `k${i}`, title: `Story ${i}`, reasons: '["x"]' }));
   expect(build(items).must).toHaveLength(2);
